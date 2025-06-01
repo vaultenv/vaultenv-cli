@@ -1,0 +1,55 @@
+# .golangci.yml
+# This configuration ensures consistent code quality across all contributors
+
+run:
+  # Timeout for analysis
+  timeout: 5m
+
+  # Include test files in analysis
+  tests: true
+
+  # Skip generated files
+  skip-dirs:
+    - vendor
+    - third_party
+
+linters:
+  enable-all: true
+  disable:
+    # These linters are too opinionated for a community project
+    - exhaustruct # Requires all struct fields to be initialized
+    - depguard # Restricts which packages can be imported
+    - gochecknoglobals # We need some globals for version info
+    - gochecknoinits # Init functions are sometimes necessary
+    - wsl # Whitespace linter is too strict
+    - nlreturn # Newline requirements are too strict
+    - varnamelen # Short variable names are fine in small scopes
+
+linters-settings:
+  # Configure specific linters
+  lll:
+    line-length: 120 # Reasonable line length for modern monitors
+
+  misspell:
+    locale: US
+
+  goimports:
+    local-prefixes: github.com/vaultenv/vaultenv-cli
+
+  govet:
+    check-shadowing: true
+
+  revive:
+    rules:
+      - name: var-naming
+        disabled: true # Allow acronyms like URL, API
+
+issues:
+  # Don't hide multiple issues from the same linter
+  max-issues-per-linter: 0
+
+  # Show all issues
+  max-same-issues: 0
+
+  # Be strict in new code, lenient with existing code
+  new: true
