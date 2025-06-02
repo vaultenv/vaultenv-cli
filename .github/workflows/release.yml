@@ -74,21 +74,45 @@ jobs:
       - name: Prepare Release Structure
         run: |
           # Create directories if they don't exist
-          mkdir -p completions docs examples
+          mkdir -p completions docs
 
           # Create placeholder files if needed
           touch CHANGELOG.md || true
-
-          # Create a simple example if the directory is empty
-          if [ ! "$(ls -A examples)" ]; then
-            echo "# VaultEnv CLI Example" > examples/README.md
-            echo "Example usage documentation will be added here." >> examples/README.md
-          fi
 
           # Create basic docs if the directory is empty
           if [ ! "$(ls -A docs)" ]; then
             echo "# VaultEnv CLI Documentation" > docs/README.md
             echo "Full documentation will be available at https://docs.vaultenv.io" >> docs/README.md
+          fi
+
+      # Clean up test artifacts to ensure clean git state
+      - name: Clean Test Artifacts
+        run: |
+          # Remove coverage files that might have been generated
+          rm -f coverage.out coverage.html *.out
+          
+          # Remove any test databases
+          rm -f *.db *.sqlite *.sqlite3
+          
+          # Don't create examples directory if it doesn't exist in the repo
+          # This prevents git from seeing untracked files
+          
+          # Also clean up any other common test artifacts
+          rm -rf tmp/ temp/ .tmp/
+          rm -f *.log *.tmp
+
+      # Verify git is clean before release
+      - name: Verify Clean Git State
+        run: |
+          echo "Checking git status..."
+          git status --porcelain
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "❌ Git working directory is not clean!"
+            echo "The following files have changes:"
+            git status --short
+            exit 1
+          else
+            echo "✅ Git working directory is clean"
           fi
 
       # Run GoReleaser

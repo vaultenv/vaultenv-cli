@@ -94,6 +94,9 @@ config.local.yml
 # Generated documentation (if any)
 /site/
 
+# Examples directory (if it contains generated content)
+examples/
+
 # Test databases
 *.db
 *.sqlite
