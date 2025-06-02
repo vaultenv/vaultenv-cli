@@ -123,7 +123,7 @@ func runSet(args []string, environment string, force bool, encrypt bool) error {
         }
 
         // Create password manager
-        pm := auth.NewPasswordManager(ks)
+        pm := auth.NewPasswordManager(ks, cfg)
 
         // Get or create encryption key
         key, err := pm.GetOrCreateMasterKey(projectID)

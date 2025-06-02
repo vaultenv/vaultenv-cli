@@ -13,7 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vaultenv/vaultenv-cli/internal/config"
 	"github.com/vaultenv/vaultenv-cli/internal/keystore"
+	"github.com/vaultenv/vaultenv-cli/internal/ui"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/term"
 )
@@ -42,6 +44,8 @@ var (
 // PasswordManager handles password operations and key derivation
 type PasswordManager struct {
 	keystore     *keystore.Keystore
+	environmentKeyManager *keystore.EnvironmentKeyManager
+	config       *config.Config
 	sessionCache map[string]*sessionEntry
 }
 
@@ -51,10 +55,13 @@ type sessionEntry struct {
 }
 
 // NewPasswordManager creates a new password manager instance
-func NewPasswordManager(ks *keystore.Keystore) *PasswordManager {
+func NewPasswordManager(ks *keystore.Keystore, cfg *config.Config) *PasswordManager {
+	envKeyManager := keystore.NewEnvironmentKeyManager(ks, cfg.Project.ID)
 	return &PasswordManager{
-		keystore:     ks,
-		sessionCache: make(map[string]*sessionEntry),
+		keystore:              ks,
+		environmentKeyManager: envKeyManager,
+		config:               cfg,
+		sessionCache:          make(map[string]*sessionEntry),
 	}
 }
 
@@ -293,6 +300,10 @@ func (pm *PasswordManager) getCacheKey(projectID string) string {
 	return fmt.Sprintf("project:%s", projectID)
 }
 
+func (pm *PasswordManager) getEnvironmentCacheKey(projectID, environment string) string {
+	return fmt.Sprintf("project:%s:env:%s", projectID, environment)
+}
+
 // GetPasswordFromEnv gets password from environment variable if set
 func (pm *PasswordManager) GetPasswordFromEnv() (string, bool) {
 	password := os.Getenv("VAULTENV_PASSWORD")
@@ -354,4 +365,266 @@ func (pm *PasswordManager) ImportKey(projectID string, exportData string, passwo
 	}
 	
 	return nil
+}
+
+// GetOrCreateEnvironmentKey gets the encryption key for a specific environment, creating it if necessary
+func (pm *PasswordManager) GetOrCreateEnvironmentKey(environment string) ([]byte, error) {
+	projectID := pm.config.Project.ID
+	
+	// If per-environment passwords are disabled, fall back to project-level key
+	if !pm.config.IsPerEnvironmentPasswordsEnabled() {
+		return pm.GetOrCreateMasterKey(projectID)
+	}
+	
+	// Check session cache first
+	cacheKey := pm.getEnvironmentCacheKey(projectID, environment)
+	if entry, ok := pm.sessionCache[cacheKey]; ok {
+		if time.Now().Before(entry.expiresAt) {
+			return entry.key, nil
+		}
+		// Clean up expired entry
+		delete(pm.sessionCache, cacheKey)
+	}
+	
+	// Try to get existing key from environment-specific keystore
+	if pm.environmentKeyManager.HasEnvironmentKey(environment) {
+		// Prompt for password with environment context
+		password, err := pm.PromptEnvironmentPassword(environment, "Enter password: ")
+		if err != nil {
+			return nil, err
+		}
+		
+		key, err := pm.environmentKeyManager.GetOrCreateEnvironmentKey(environment, password)
+		if err != nil {
+			return nil, err
+		}
+		
+		// Cache the key for the session
+		pm.cacheEnvironmentKey(projectID, environment, key)
+		return key, nil
+	}
+	
+	// Create new environment key
+	ui.Info("Creating new encryption key for environment: %s", environment)
+	password, err := pm.PromptNewEnvironmentPassword(environment)
+	if err != nil {
+		return nil, err
+	}
+	
+	key, err := pm.environmentKeyManager.GetOrCreateEnvironmentKey(environment, password)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Cache the key for the session
+	pm.cacheEnvironmentKey(projectID, environment, key)
+	return key, nil
+}
+
+// PromptEnvironmentPassword prompts for a password for a specific environment
+func (pm *PasswordManager) PromptEnvironmentPassword(environment, prompt string) (string, error) {
+	// Check environment variable first
+	envVar := fmt.Sprintf("VAULTENV_PASSWORD_%s", strings.ToUpper(environment))
+	if password := os.Getenv(envVar); password != "" {
+		return password, nil
+	}
+	
+	// Fall back to generic environment variable
+	if password, exists := pm.GetPasswordFromEnv(); exists {
+		return password, nil
+	}
+	
+	// Prompt user with environment context
+	fullPrompt := fmt.Sprintf("[%s] %s", environment, prompt)
+	return pm.PromptPassword(fullPrompt)
+}
+
+// PromptNewEnvironmentPassword prompts for a new password for an environment with policy validation
+func (pm *PasswordManager) PromptNewEnvironmentPassword(environment string) (string, error) {
+	policy := pm.config.GetPasswordPolicy(environment)
+	
+	ui.Info("Setting up password for environment: %s", environment)
+	if policy.MinLength > 8 {
+		ui.Info("Password policy requires: minimum %d characters", policy.MinLength)
+		if policy.RequireUpper {
+			ui.Info("  - At least one uppercase letter")
+		}
+		if policy.RequireLower {
+			ui.Info("  - At least one lowercase letter")
+		}
+		if policy.RequireNumbers {
+			ui.Info("  - At least one number")
+		}
+		if policy.RequireSpecial {
+			ui.Info("  - At least one special character")
+		}
+		if policy.PreventCommon {
+			ui.Info("  - Cannot be a common password")
+		}
+	}
+	
+	for {
+		password, err := pm.PromptEnvironmentPassword(environment, "Enter password: ")
+		if err != nil {
+			return "", err
+		}
+		
+		// Validate against policy
+		if err := pm.validatePasswordPolicy(password, policy); err != nil {
+			ui.Error("Password validation failed: %v", err)
+			continue
+		}
+		
+		confirm, err := pm.PromptEnvironmentPassword(environment, "Confirm password: ")
+		if err != nil {
+			return "", err
+		}
+		
+		if password != confirm {
+			ui.Error("Passwords do not match, please try again")
+			continue
+		}
+		
+		return password, nil
+	}
+}
+
+// validatePasswordPolicy validates a password against the given policy
+func (pm *PasswordManager) validatePasswordPolicy(password string, policy config.PassPolicy) error {
+	if len(password) < policy.MinLength {
+		return fmt.Errorf("password must be at least %d characters long", policy.MinLength)
+	}
+	
+	if policy.RequireUpper && !containsUppercase(password) {
+		return fmt.Errorf("password must contain at least one uppercase letter")
+	}
+	
+	if policy.RequireLower && !containsLowercase(password) {
+		return fmt.Errorf("password must contain at least one lowercase letter")
+	}
+	
+	if policy.RequireNumbers && !containsNumber(password) {
+		return fmt.Errorf("password must contain at least one number")
+	}
+	
+	if policy.RequireSpecial && !containsSpecial(password) {
+		return fmt.Errorf("password must contain at least one special character")
+	}
+	
+	if policy.PreventCommon && isCommonPassword(password) {
+		return fmt.Errorf("this password is too common, please choose a more unique password")
+	}
+	
+	return nil
+}
+
+// ChangeEnvironmentPassword changes the password for a specific environment
+func (pm *PasswordManager) ChangeEnvironmentPassword(environment string) error {
+	if !pm.config.IsPerEnvironmentPasswordsEnabled() {
+		return fmt.Errorf("per-environment passwords are not enabled for this project")
+	}
+	
+	// Verify current password
+	currentPassword, err := pm.PromptEnvironmentPassword(environment, "Enter current password: ")
+	if err != nil {
+		return err
+	}
+	
+	// Verify current password by attempting to derive key
+	_, err = pm.environmentKeyManager.GetOrCreateEnvironmentKey(environment, currentPassword)
+	if err != nil {
+		return fmt.Errorf("current password is incorrect: %w", err)
+	}
+	
+	// Get new password
+	newPassword, err := pm.PromptNewEnvironmentPassword(environment)
+	if err != nil {
+		return err
+	}
+	
+	// Change password using environment key manager
+	err = pm.environmentKeyManager.ChangeEnvironmentPassword(environment, currentPassword, newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to change password: %w", err)
+	}
+	
+	// Clear session cache for this environment
+	cacheKey := pm.getEnvironmentCacheKey(pm.config.Project.ID, environment)
+	delete(pm.sessionCache, cacheKey)
+	
+	ui.Success("Password changed successfully for environment: %s", environment)
+	return nil
+}
+
+// cacheEnvironmentKey caches an environment-specific key for the session
+func (pm *PasswordManager) cacheEnvironmentKey(projectID, environment string, key []byte) {
+	cacheKey := pm.getEnvironmentCacheKey(projectID, environment)
+	pm.sessionCache[cacheKey] = &sessionEntry{
+		key:       key,
+		expiresAt: time.Now().Add(sessionCacheDuration),
+	}
+}
+
+// ClearEnvironmentCache clears cached session key for a specific environment
+func (pm *PasswordManager) ClearEnvironmentCache(environment string) {
+	cacheKey := pm.getEnvironmentCacheKey(pm.config.Project.ID, environment)
+	delete(pm.sessionCache, cacheKey)
+}
+
+// Helper functions for password validation
+
+func containsUppercase(s string) bool {
+	for _, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			return true
+		}
+	}
+	return false
+}
+
+func containsLowercase(s string) bool {
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' {
+			return true
+		}
+	}
+	return false
+}
+
+func containsNumber(s string) bool {
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			return true
+		}
+	}
+	return false
+}
+
+func containsSpecial(s string) bool {
+	specialChars := "!@#$%^&*()_+-=[]{}|;:,.<>?"
+	for _, r := range s {
+		for _, special := range specialChars {
+			if r == special {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isCommonPassword(password string) bool {
+	// Basic list of common passwords - in production, this would be a comprehensive list
+	commonPasswords := []string{
+		"password", "123456", "password123", "admin", "qwerty", 
+		"letmein", "welcome", "monkey", "1234567890", "abc123",
+		"Password1", "password1", "123456789", "welcome123",
+	}
+	
+	lowerPassword := strings.ToLower(password)
+	for _, common := range commonPasswords {
+		if lowerPassword == strings.ToLower(common) {
+			return true
+		}
+	}
+	return false
 }

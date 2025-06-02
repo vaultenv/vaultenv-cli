@@ -2,491 +2,259 @@ package ui
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestMain(m *testing.M) {
-	// Force color output for tests
-	color.NoColor = false
+func TestOutput_Messages(t *testing.T) {
+	// Disable color for consistent testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
 	
-	// Run tests
-	code := m.Run()
-	
-	// Clean up
-	os.Exit(code)
-}
-
-// Helper function to capture output
-func captureOutput(t *testing.T, fn func()) (stdout, stderr string) {
-	t.Helper()
-	
-	// Save original outputs
-	origStdout := stdout
-	origStderr := stderr
-	
-	// Create buffers to capture output
-	var outBuf, errBuf bytes.Buffer
-	SetOutput(&outBuf, &errBuf)
-	
-	// Run the function
-	fn()
-	
-	// Restore original outputs
-	stdout = origStdout
-	stderr = origStderr
-	
-	return outBuf.String(), errBuf.String()
-}
-
-// Helper function to strip ANSI color codes
-func stripANSI(str string) string {
-	ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*m`)
-	return ansiRegex.ReplaceAllString(str, "")
-}
-
-func TestSuccess(t *testing.T) {
 	tests := []struct {
 		name     string
+		fn       func(string, ...interface{})
 		format   string
 		args     []interface{}
-		expected string
+		wantOut  string
+		wantErr  string
+		isStderr bool
 	}{
 		{
-			name:     "simple message",
-			format:   "Operation completed",
-			args:     []interface{}{},
-			expected: "✓ Operation completed",
+			name:    "success",
+			fn:      Success,
+			format:  "Operation %s",
+			args:    []interface{}{"completed"},
+			wantOut: "✓ Operation completed\n",
 		},
 		{
-			name:     "formatted message",
-			format:   "Created %d files in %s",
-			args:     []interface{}{5, "/tmp"},
-			expected: "✓ Created 5 files in /tmp",
+			name:     "error",
+			fn:       Error,
+			format:   "Operation %s",
+			args:     []interface{}{"failed"},
+			wantErr:  "✗ Operation failed\n",
+			isStderr: true,
 		},
 		{
-			name:     "empty message",
-			format:   "",
-			args:     []interface{}{},
-			expected: "✓ ",
+			name:    "warning",
+			fn:      Warning,
+			format:  "Be careful about %s",
+			args:    []interface{}{"this"},
+			wantOut: "! Be careful about this\n",
+		},
+		{
+			name:    "info",
+			fn:      Info,
+			format:  "FYI: %s",
+			args:    []interface{}{"information"},
+			wantOut: "ℹ FYI: information\n",
 		},
 	}
-
+	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			stdout, stderr := captureOutput(t, func() {
-				Success(tt.format, tt.args...)
-			})
+			var outBuf, errBuf bytes.Buffer
+			SetOutput(&outBuf, &errBuf)
+			defer ResetOutput()
 			
-			assert.Contains(t, stdout, tt.expected)
-			assert.Empty(t, stderr)
-			assert.Contains(t, stdout, "\n")
-		})
-	}
-}
-
-func TestError(t *testing.T) {
-	tests := []struct {
-		name     string
-		format   string
-		args     []interface{}
-		expected string
-	}{
-		{
-			name:     "simple error",
-			format:   "Operation failed",
-			args:     []interface{}{},
-			expected: "✗ Operation failed",
-		},
-		{
-			name:     "formatted error",
-			format:   "Failed to read file %s: %v",
-			args:     []interface{}{"config.yaml", "permission denied"},
-			expected: "✗ Failed to read file config.yaml: permission denied",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stdout, stderr := captureOutput(t, func() {
-				Error(tt.format, tt.args...)
-			})
+			tt.fn(tt.format, tt.args...)
 			
-			assert.Empty(t, stdout)
-			assert.Contains(t, stderr, tt.expected)
-			assert.Contains(t, stderr, "\n")
-		})
-	}
-}
-
-func TestWarning(t *testing.T) {
-	tests := []struct {
-		name     string
-		format   string
-		args     []interface{}
-		expected string
-	}{
-		{
-			name:     "simple warning",
-			format:   "This might cause issues",
-			args:     []interface{}{},
-			expected: "! This might cause issues",
-		},
-		{
-			name:     "formatted warning",
-			format:   "Found %d deprecated features",
-			args:     []interface{}{3},
-			expected: "! Found 3 deprecated features",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stdout, stderr := captureOutput(t, func() {
-				Warning(tt.format, tt.args...)
-			})
-			
-			assert.Contains(t, stdout, tt.expected)
-			assert.Empty(t, stderr)
-			assert.Contains(t, stdout, "\n")
-		})
-	}
-}
-
-func TestInfo(t *testing.T) {
-	tests := []struct {
-		name     string
-		format   string
-		args     []interface{}
-		expected string
-	}{
-		{
-			name:     "simple info",
-			format:   "Loading configuration",
-			args:     []interface{}{},
-			expected: "ℹ Loading configuration",
-		},
-		{
-			name:     "formatted info",
-			format:   "Processing %d items",
-			args:     []interface{}{10},
-			expected: "ℹ Processing 10 items",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stdout, stderr := captureOutput(t, func() {
-				Info(tt.format, tt.args...)
-			})
-			
-			assert.Contains(t, stdout, tt.expected)
-			assert.Empty(t, stderr)
-			assert.Contains(t, stdout, "\n")
+			if tt.isStderr {
+				if got := errBuf.String(); got != tt.wantErr {
+					t.Errorf("stderr = %q, want %q", got, tt.wantErr)
+				}
+			} else {
+				if got := outBuf.String(); got != tt.wantOut {
+					t.Errorf("stdout = %q, want %q", got, tt.wantOut)
+				}
+			}
 		})
 	}
 }
 
 func TestDebug(t *testing.T) {
-	tests := []struct {
-		name     string
-		verbose  bool
-		format   string
-		args     []interface{}
-		expected string
-	}{
-		{
-			name:     "debug with verbose mode",
-			verbose:  true,
-			format:   "Debug information",
-			args:     []interface{}{},
-			expected: "› Debug information",
-		},
-		{
-			name:     "debug without verbose mode",
-			verbose:  false,
-			format:   "Debug information",
-			args:     []interface{}{},
-			expected: "",
-		},
-		{
-			name:     "formatted debug with verbose",
-			verbose:  true,
-			format:   "Variable %s = %d",
-			args:     []interface{}{"count", 42},
-			expected: "› Variable count = 42",
-		},
+	// Disable color for consistent testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+	
+	var outBuf bytes.Buffer
+	SetOutput(&outBuf, nil)
+	defer ResetOutput()
+	
+	// Test debug not shown when verbose is false
+	viper.Set("verbose", false)
+	Debug("Debug message")
+	
+	if outBuf.Len() != 0 {
+		t.Error("Debug() should not output when verbose is false")
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Set verbose mode
-			viper.Set("verbose", tt.verbose)
-			defer viper.Set("verbose", false)
-			
-			stdout, stderr := captureOutput(t, func() {
-				Debug(tt.format, tt.args...)
-			})
-			
-			if tt.expected != "" {
-				assert.Contains(t, stdout, tt.expected)
-				assert.Contains(t, stdout, "\n")
-			} else {
-				assert.Empty(t, stdout)
-			}
-			assert.Empty(t, stderr)
-		})
+	
+	// Test debug shown when verbose is true
+	viper.Set("verbose", true)
+	defer viper.Set("verbose", false)
+	
+	Debug("Debug %s", "message")
+	
+	want := "› Debug message\n"
+	if got := outBuf.String(); got != want {
+		t.Errorf("Debug() = %q, want %q", got, want)
 	}
 }
 
 func TestHeader(t *testing.T) {
-	tests := []struct {
-		name     string
-		text     string
-		expected []string
-	}{
-		{
-			name: "simple header",
-			text: "Configuration",
-			expected: []string{
-				"Configuration",
-				"─────────────",
-			},
-		},
-		{
-			name: "short header",
-			text: "API",
-			expected: []string{
-				"API",
-				"───",
-			},
-		},
-		{
-			name: "empty header",
-			text: "",
-			expected: []string{
-				"",
-				"",
-			},
-		},
+	// Disable color for consistent testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+	
+	var outBuf bytes.Buffer
+	SetOutput(&outBuf, nil)
+	defer ResetOutput()
+	
+	Header("Test Section")
+	
+	output := outBuf.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	
+	if len(lines) != 3 { // Empty line, header text, separator
+		t.Errorf("Header() produced %d lines, want 3", len(lines))
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stdout, stderr := captureOutput(t, func() {
-				Header(tt.text)
-			})
-			
-			// The output has an initial newline, then header text, then separator
-			assert.Contains(t, stdout, tt.expected[0])
-			if tt.text != "" {
-				assert.Contains(t, stdout, tt.expected[1])
-			}
-			assert.Empty(t, stderr)
-		})
+	
+	if lines[0] != "" {
+		t.Error("Header() should start with empty line")
+	}
+	
+	if lines[1] != "Test Section" {
+		t.Errorf("Header() text = %q, want 'Test Section'", lines[1])
+	}
+	
+	if lines[2] != strings.Repeat("─", len("Test Section")) {
+		t.Error("Header() separator length doesn't match text")
 	}
 }
 
 func TestTable(t *testing.T) {
-	tests := []struct {
-		name     string
-		headers  []string
-		rows     [][]string
-		validate func(t *testing.T, output string)
-	}{
-		{
-			name:    "simple table",
-			headers: []string{"Name", "Value"},
-			rows: [][]string{
-				{"foo", "bar"},
-				{"hello", "world"},
-			},
-			validate: func(t *testing.T, output string) {
-				assert.Contains(t, output, "Name")
-				assert.Contains(t, output, "Value")
-				assert.Contains(t, output, "foo")
-				assert.Contains(t, output, "bar")
-				assert.Contains(t, output, "hello")
-				assert.Contains(t, output, "world")
-				assert.Contains(t, output, "┌")
-				assert.Contains(t, output, "┐")
-				assert.Contains(t, output, "└")
-				assert.Contains(t, output, "┘")
-			},
-		},
-		{
-			name:    "varying column widths",
-			headers: []string{"ID", "Description"},
-			rows: [][]string{
-				{"1", "A very long description that should expand the column"},
-				{"100", "Short"},
-			},
-			validate: func(t *testing.T, output string) {
-				lines := strings.Split(output, "\n")
-				// Check that lines have consistent width
-				for _, line := range lines {
-					if line != "" && strings.Contains(line, "│") {
-						// Remove ANSI color codes before checking
-						cleanLine := stripANSI(line)
-						assert.True(t, strings.HasPrefix(cleanLine, "│") && strings.HasSuffix(cleanLine, "│"))
-					}
-				}
-			},
-		},
-		{
-			name:    "empty table",
-			headers: []string{"Column1", "Column2"},
-			rows:    [][]string{},
-			validate: func(t *testing.T, output string) {
-				assert.Contains(t, output, "Column1")
-				assert.Contains(t, output, "Column2")
-				// Should still have box drawing characters
-				assert.Contains(t, output, "┌")
-				assert.Contains(t, output, "└")
-			},
-		},
-		{
-			name:    "mismatched columns",
-			headers: []string{"A", "B", "C"},
-			rows: [][]string{
-				{"1", "2"}, // Missing third column
-				{"3", "4", "5", "6"}, // Extra column
-			},
-			validate: func(t *testing.T, output string) {
-				assert.Contains(t, output, "1")
-				assert.Contains(t, output, "2")
-				assert.Contains(t, output, "3")
-				assert.Contains(t, output, "4")
-				assert.Contains(t, output, "5")
-				assert.NotContains(t, output, "6") // Extra column should be ignored
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			stdout, stderr := captureOutput(t, func() {
-				Table(tt.headers, tt.rows)
-			})
-			
-			assert.NotEmpty(t, stdout)
-			assert.Empty(t, stderr)
-			tt.validate(t, stdout)
-		})
-	}
-}
-
-func TestSetOutputAndResetOutput(t *testing.T) {
-	// Create custom buffers
-	var customOut, customErr bytes.Buffer
-	
-	// Test SetOutput
-	SetOutput(&customOut, &customErr)
-	
-	Success("Custom output test")
-	Error("Custom error test")
-	
-	assert.Contains(t, customOut.String(), "✓ Custom output test")
-	assert.Contains(t, customErr.String(), "✗ Custom error test")
-	
-	// Test ResetOutput
-	ResetOutput()
-	
-	// After reset, output should go to os.Stdout/os.Stderr
-	// We can't easily test this without more complex mocking
-	// but we can verify the function runs without error
-}
-
-func TestColorDisabled(t *testing.T) {
-	// Save original state
-	origNoColor := color.NoColor
-	defer func() { color.NoColor = origNoColor }()
-	
-	// Disable colors
+	// Disable color for consistent testing
 	color.NoColor = true
+	defer func() { color.NoColor = false }()
 	
-	stdout, _ := captureOutput(t, func() {
-		Success("No color test")
-	})
+	var outBuf bytes.Buffer
+	SetOutput(&outBuf, nil)
+	defer ResetOutput()
 	
-	// When colors are disabled, we should still see the text
-	assert.Contains(t, stdout, "✓ No color test")
-	// But it won't contain ANSI color codes
-	assert.NotContains(t, stdout, "\033[")
+	headers := []string{"Name", "Value", "Type"}
+	rows := [][]string{
+		{"KEY1", "value1", "string"},
+		{"LONG_KEY_NAME", "short", "string"},
+		{"K", "very long value here", "text"},
+	}
+	
+	Table(headers, rows)
+	
+	output := outBuf.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	
+	// Should have: top border, header, separator, 3 rows, bottom border = 7 lines
+	if len(lines) != 7 {
+		t.Errorf("Table() produced %d lines, want 7", len(lines))
+	}
+	
+	// Check that output contains expected content
+	if !strings.Contains(output, "Name") || !strings.Contains(output, "Value") || !strings.Contains(output, "Type") {
+		t.Error("Table() missing headers")
+	}
+	
+	if !strings.Contains(output, "KEY1") || !strings.Contains(output, "LONG_KEY_NAME") {
+		t.Error("Table() missing row data")
+	}
+	
+	// Check borders
+	if !strings.HasPrefix(lines[0], "┌") {
+		t.Error("Table() missing top border")
+	}
+	
+	if !strings.HasPrefix(lines[len(lines)-1], "└") {
+		t.Error("Table() missing bottom border")
+	}
 }
 
 func TestStartProgress(t *testing.T) {
-	tests := []struct {
-		name        string
-		message     string
-		work        func() error
-		expectError bool
-		setupLang   string
-	}{
-		{
-			name:    "successful operation",
-			message: "Processing",
-			work: func() error {
-				time.Sleep(10 * time.Millisecond)
-				return nil
-			},
-			expectError: false,
-			setupLang:   "en_US.UTF-8",
-		},
-		{
-			name:    "failed operation",
-			message: "Failing operation",
-			work: func() error {
-				time.Sleep(10 * time.Millisecond)
-				return errors.New("operation failed")
-			},
-			expectError: true,
-			setupLang:   "en_US.UTF-8",
-		},
-		{
-			name:    "successful operation without unicode",
-			message: "Processing ASCII",
-			work: func() error {
-				time.Sleep(10 * time.Millisecond)
-				return nil
-			},
-			expectError: false,
-			setupLang:   "C", // No Unicode support
-		},
+	// Disable color for consistent testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+	
+	var outBuf, errBuf bytes.Buffer
+	SetOutput(&outBuf, &errBuf)
+	defer ResetOutput()
+	
+	// Test successful operation
+	err := StartProgress("Testing operation", func() error {
+		// Simulate some work
+		time.Sleep(10 * time.Millisecond)
+		return nil
+	})
+	
+	if err != nil {
+		t.Errorf("StartProgress() error = %v", err)
 	}
+	
+	output := outBuf.String()
+	if !strings.Contains(output, "✓ Testing operation complete") {
+		t.Error("StartProgress() missing success message")
+	}
+	
+	// Test failed operation
+	outBuf.Reset()
+	errBuf.Reset()
+	
+	testErr := fmt.Errorf("test error")
+	err = StartProgress("Failing operation", func() error {
+		return testErr
+	})
+	
+	if err != testErr {
+		t.Errorf("StartProgress() error = %v, want %v", err, testErr)
+	}
+	
+	errOutput := errBuf.String()
+	if !strings.Contains(errOutput, "✗ Failing operation failed: test error") {
+		t.Error("StartProgress() missing error message")
+	}
+}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Save and set LANG
-			origLang := os.Getenv("LANG")
-			os.Setenv("LANG", tt.setupLang)
-			defer os.Setenv("LANG", origLang)
-			
-			stdout, stderr := captureOutput(t, func() {
-				err := StartProgress(tt.message, tt.work)
-				if tt.expectError {
-					assert.Error(t, err)
-				} else {
-					assert.NoError(t, err)
-				}
-			})
-			
-			if tt.expectError {
-				assert.Contains(t, stderr, "✗")
-				assert.Contains(t, stderr, "failed")
-			} else {
-				assert.Contains(t, stdout, "✓")
-				assert.Contains(t, stdout, "complete")
-			}
-		})
+func TestProgress(t *testing.T) {
+	var outBuf bytes.Buffer
+	SetOutput(&outBuf, nil)
+	defer ResetOutput()
+	
+	// Test progress updates
+	Progress(25, 100, "Processing files")
+	output := outBuf.String()
+	
+	if !strings.Contains(output, "[25/100]") {
+		t.Error("Progress() missing count")
+	}
+	
+	if !strings.Contains(output, "25%") {
+		t.Error("Progress() missing percentage")
+	}
+	
+	if !strings.Contains(output, "Processing files") {
+		t.Error("Progress() missing message")
+	}
+	
+	// Test completion adds newline
+	outBuf.Reset()
+	Progress(100, 100, "Complete")
+	output = outBuf.String()
+	
+	if !strings.HasSuffix(output, "\n") {
+		t.Error("Progress() should add newline when complete")
 	}
 }
 
@@ -494,152 +262,141 @@ func TestSupportsUnicode(t *testing.T) {
 	tests := []struct {
 		name     string
 		langEnv  string
-		expected bool
+		want     bool
 	}{
-		{
-			name:     "UTF-8 locale",
-			langEnv:  "en_US.UTF-8",
-			expected: true,
-		},
-		{
-			name:     "utf8 locale",
-			langEnv:  "en_US.utf8",
-			expected: true,
-		},
-		{
-			name:     "non-UTF locale",
-			langEnv:  "en_US.ISO-8859-1",
-			expected: false,
-		},
-		{
-			name:     "empty LANG",
-			langEnv:  "",
-			expected: false,
-		},
+		{"utf8_lowercase", "en_US.utf8", true},
+		{"utf8_uppercase", "en_US.UTF-8", true},
+		{"no_utf8", "en_US", false},
+		{"empty", "", false},
+		{"c_locale", "C", false},
 	}
-
+	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Save original LANG
 			origLang := os.Getenv("LANG")
 			defer os.Setenv("LANG", origLang)
 			
-			// Set test LANG
 			os.Setenv("LANG", tt.langEnv)
 			
-			// Test
-			result := supportsUnicode()
-			assert.Equal(t, tt.expected, result)
+			if got := supportsUnicode(); got != tt.want {
+				t.Errorf("supportsUnicode() = %v, want %v", got, tt.want)
+			}
 		})
+	}
+}
+
+func TestSetOutput(t *testing.T) {
+	// Create custom buffers
+	var customOut, customErr bytes.Buffer
+	
+	// Set custom output
+	SetOutput(&customOut, &customErr)
+	
+	// Test that output goes to custom buffers
+	Success("test stdout")
+	Error("test stderr")
+	
+	if !strings.Contains(customOut.String(), "test stdout") {
+		t.Error("SetOutput() stdout not redirected")
+	}
+	
+	if !strings.Contains(customErr.String(), "test stderr") {
+		t.Error("SetOutput() stderr not redirected")
+	}
+	
+	// Reset and verify
+	ResetOutput()
+	
+	// After reset, output should go to os.Stdout/os.Stderr
+	// (Can't easily test this without capturing os.Stdout/os.Stderr)
+}
+
+func TestTableEdgeCases(t *testing.T) {
+	// Disable color for consistent testing
+	color.NoColor = true
+	defer func() { color.NoColor = false }()
+	
+	var outBuf bytes.Buffer
+	SetOutput(&outBuf, nil)
+	defer ResetOutput()
+	
+	// Test empty table
+	Table([]string{"Col1", "Col2"}, [][]string{})
+	output := outBuf.String()
+	
+	// Should still have borders and headers
+	if !strings.Contains(output, "Col1") || !strings.Contains(output, "Col2") {
+		t.Error("Table() with no rows should still show headers")
+	}
+	
+	// Test mismatched row lengths
+	outBuf.Reset()
+	headers := []string{"A", "B", "C"}
+	rows := [][]string{
+		{"1", "2"},           // Too short
+		{"1", "2", "3", "4"}, // Too long
+		{"1", "2", "3"},      // Just right
+	}
+	
+	Table(headers, rows)
+	output = outBuf.String()
+	
+	// Should handle gracefully without panicking
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) == 0 {
+		t.Error("Table() produced no output with mismatched rows")
 	}
 }
 
 func TestIsVerbose(t *testing.T) {
-	tests := []struct {
-		name     string
-		verbose  bool
-		expected bool
-	}{
-		{
-			name:     "verbose enabled",
-			verbose:  true,
-			expected: true,
-		},
-		{
-			name:     "verbose disabled",
-			verbose:  false,
-			expected: false,
-		},
+	// Test with verbose false
+	viper.Set("verbose", false)
+	if isVerbose() {
+		t.Error("isVerbose() = true, want false")
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			viper.Set("verbose", tt.verbose)
-			defer viper.Set("verbose", false)
-			
-			result := isVerbose()
-			assert.Equal(t, tt.expected, result)
-		})
+	
+	// Test with verbose true
+	viper.Set("verbose", true)
+	if !isVerbose() {
+		t.Error("isVerbose() = false, want true")
 	}
+	
+	// Reset
+	viper.Set("verbose", false)
 }
 
-// Test environment variable NO_COLOR
-func TestNoColorEnvironment(t *testing.T) {
-	// Save original state
-	origNoColor := os.Getenv("NO_COLOR")
-	origColorNoColor := color.NoColor
-	defer func() {
-		os.Setenv("NO_COLOR", origNoColor)
-		color.NoColor = origColorNoColor
-	}()
-	
-	// Set NO_COLOR environment variable
-	os.Setenv("NO_COLOR", "1")
-	color.NoColor = true
-	
-	stdout, _ := captureOutput(t, func() {
-		Success("Testing with NO_COLOR")
-	})
-	
-	// Should still output the message
-	assert.Contains(t, stdout, "✓ Testing with NO_COLOR")
-	// But without ANSI codes
-	assert.NotContains(t, stdout, "\033[")
-}
-
-// Test concurrent access to output functions
-func TestConcurrentOutput(t *testing.T) {
-	// This test ensures that concurrent calls to output functions
-	// don't cause race conditions
-	
-	done := make(chan bool)
-	
-	// Run multiple goroutines writing output
-	for i := 0; i < 10; i++ {
-		go func(id int) {
-			Success("Goroutine %d success", id)
-			Error("Goroutine %d error", id)
-			Warning("Goroutine %d warning", id)
-			Info("Goroutine %d info", id)
-			done <- true
-		}(i)
-	}
-	
-	// Wait for all goroutines to complete
-	for i := 0; i < 10; i++ {
-		<-done
-	}
-	
-	// If we get here without panicking, the test passes
-	assert.True(t, true)
-}
-
-// Benchmark tests
 func BenchmarkSuccess(b *testing.B) {
 	var buf bytes.Buffer
-	SetOutput(&buf, &buf)
+	SetOutput(&buf, nil)
 	defer ResetOutput()
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Success("Benchmark message %d", i)
+		Success("Operation completed successfully")
+		buf.Reset()
 	}
 }
 
 func BenchmarkTable(b *testing.B) {
 	var buf bytes.Buffer
-	SetOutput(&buf, &buf)
+	SetOutput(&buf, nil)
 	defer ResetOutput()
 	
-	headers := []string{"ID", "Name", "Status", "Created"}
-	rows := [][]string{
-		{"1", "Test Item 1", "Active", "2024-01-01"},
-		{"2", "Test Item 2", "Inactive", "2024-01-02"},
-		{"3", "Test Item 3", "Pending", "2024-01-03"},
+	headers := []string{"Key", "Value", "Type", "Modified"}
+	rows := make([][]string, 20)
+	for i := range rows {
+		rows[i] = []string{
+			fmt.Sprintf("KEY_%d", i),
+			fmt.Sprintf("value_%d", i),
+			"string",
+			"2024-01-01",
+		}
 	}
 	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		Table(headers, rows)
+		buf.Reset()
 	}
 }

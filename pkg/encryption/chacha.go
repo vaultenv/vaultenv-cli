@@ -35,3 +35,13 @@ func (e *ChaChaEncryptor) Encrypt(plaintext []byte, key []byte) ([]byte, error) 
 func (e *ChaChaEncryptor) Decrypt(ciphertext []byte, key []byte) ([]byte, error) {
 	return nil, errors.New("ChaCha20-Poly1305 not yet implemented")
 }
+
+// EncryptString encrypts a string and returns base64-encoded result
+func (e *ChaChaEncryptor) EncryptString(plaintext string, key []byte) (string, error) {
+	return "", errors.New("ChaCha20-Poly1305 not yet implemented")
+}
+
+// DecryptString decrypts a base64-encoded string
+func (e *ChaChaEncryptor) DecryptString(ciphertext string, key []byte) (string, error) {
+	return "", errors.New("ChaCha20-Poly1305 not yet implemented")
+}

@@ -155,7 +155,7 @@ sync:
   enabled: false
   
   # Sync interval (in seconds)
-  interval: 300
+  interval: 300s
 `
 
     err = ui.StartProgress("Creating configuration", func() error {

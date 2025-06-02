@@ -183,9 +183,9 @@ func (s *SQLiteBackend) Set(key, value string, encrypt bool) error {
 	
 	// Add audit log
 	_, err = tx.Exec(`
-		INSERT INTO audit_log (environment, action, key, user)
-		VALUES (?, ?, ?, ?)
-	`, s.environment, "SET", key, getCurrentUser())
+		INSERT INTO audit_log (environment, action, key, user, success)
+		VALUES (?, ?, ?, ?, ?)
+	`, s.environment, "SET", key, getCurrentUser(), true)
 	
 	if err != nil {
 		return fmt.Errorf("failed to add audit log: %w", err)
@@ -202,6 +202,15 @@ func (s *SQLiteBackend) Get(key string) (string, error) {
 		WHERE environment = ? AND key = ?
 	`, s.environment, key).Scan(&value)
 	
+	// Add audit log (async to not slow down reads)
+	success := err == nil
+	go func() {
+		s.db.Exec(`
+			INSERT INTO audit_log (environment, action, key, user, success)
+			VALUES (?, ?, ?, ?, ?)
+		`, s.environment, "GET", key, getCurrentUser(), success)
+	}()
+	
 	if err == sql.ErrNoRows {
 		return "", ErrNotFound
 	}
@@ -209,14 +218,6 @@ func (s *SQLiteBackend) Get(key string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get secret: %w", err)
 	}
-	
-	// Add audit log (async to not slow down reads)
-	go func() {
-		s.db.Exec(`
-			INSERT INTO audit_log (environment, action, key, user)
-			VALUES (?, ?, ?, ?)
-		`, s.environment, "GET", key, getCurrentUser())
-	}()
 	
 	return value, nil
 }
@@ -253,7 +254,8 @@ func (s *SQLiteBackend) Delete(key string) error {
 	`, s.environment, key).Scan(&id, &version)
 	
 	if err == sql.ErrNoRows {
-		return ErrNotFound
+		// Key doesn't exist, nothing to delete
+		return nil
 	}
 	
 	if err != nil {
@@ -282,9 +284,9 @@ func (s *SQLiteBackend) Delete(key string) error {
 	
 	// Add audit log
 	_, err = tx.Exec(`
-		INSERT INTO audit_log (environment, action, key, user)
-		VALUES (?, ?, ?, ?)
-	`, s.environment, "DELETE", key, getCurrentUser())
+		INSERT INTO audit_log (environment, action, key, user, success)
+		VALUES (?, ?, ?, ?, ?)
+	`, s.environment, "DELETE", key, getCurrentUser(), true)
 	
 	if err != nil {
 		return fmt.Errorf("failed to add audit log: %w", err)
@@ -314,6 +316,14 @@ func (s *SQLiteBackend) List() ([]string, error) {
 		}
 		keys = append(keys, key)
 	}
+	
+	// Add audit log for LIST operation
+	go func() {
+		s.db.Exec(`
+			INSERT INTO audit_log (environment, action, key, user, success)
+			VALUES (?, ?, ?, ?, ?)
+		`, s.environment, "LIST", "", getCurrentUser(), true)
+	}()
 	
 	return keys, rows.Err()
 }

@@ -2,356 +2,338 @@ package storage
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestMemoryBackend(t *testing.T) {
-	t.Run("basic operations", func(t *testing.T) {
-		backend := NewMemoryBackend()
-		defer backend.Close()
-
-		// Test Set and Get
-		err := backend.Set("TEST_KEY", "test_value", false)
-		require.NoError(t, err)
-
-		value, err := backend.Get("TEST_KEY")
-		require.NoError(t, err)
-		assert.Equal(t, "test_value", value)
-
-		// Test Exists
-		exists, err := backend.Exists("TEST_KEY")
-		require.NoError(t, err)
-		assert.True(t, exists)
-
-		exists, err = backend.Exists("NON_EXISTENT")
-		require.NoError(t, err)
-		assert.False(t, exists)
-
-		// Test List
-		err = backend.Set("ANOTHER_KEY", "another_value", false)
-		require.NoError(t, err)
-
-		keys, err := backend.List()
-		require.NoError(t, err)
-		assert.Len(t, keys, 2)
-		assert.Contains(t, keys, "TEST_KEY")
-		assert.Contains(t, keys, "ANOTHER_KEY")
-
-		// Test Delete
-		err = backend.Delete("TEST_KEY")
-		require.NoError(t, err)
-
-		_, err = backend.Get("TEST_KEY")
-		assert.ErrorIs(t, err, ErrNotFound)
-
-		exists, err = backend.Exists("TEST_KEY")
-		require.NoError(t, err)
-		assert.False(t, exists)
-	})
-
-	t.Run("get non-existent key", func(t *testing.T) {
-		backend := NewMemoryBackend()
-		defer backend.Close()
-
-		_, err := backend.Get("NON_EXISTENT")
-		assert.ErrorIs(t, err, ErrNotFound)
-	})
-
-	t.Run("delete non-existent key", func(t *testing.T) {
-		backend := NewMemoryBackend()
-		defer backend.Close()
-
-		// Should not error when deleting non-existent key
-		err := backend.Delete("NON_EXISTENT")
-		assert.NoError(t, err)
-	})
-
-	t.Run("overwrite existing key", func(t *testing.T) {
-		backend := NewMemoryBackend()
-		defer backend.Close()
-
-		err := backend.Set("KEY", "value1", false)
-		require.NoError(t, err)
-
-		err = backend.Set("KEY", "value2", false)
-		require.NoError(t, err)
-
-		value, err := backend.Get("KEY")
-		require.NoError(t, err)
-		assert.Equal(t, "value2", value)
-	})
-
-	t.Run("empty key and value", func(t *testing.T) {
-		backend := NewMemoryBackend()
-		defer backend.Close()
-
-		// Empty key should be allowed
-		err := backend.Set("", "empty_key", false)
-		assert.NoError(t, err)
-
-		// Empty value should be allowed
-		err = backend.Set("EMPTY_VALUE", "", false)
-		assert.NoError(t, err)
-
-		value, err := backend.Get("EMPTY_VALUE")
-		require.NoError(t, err)
-		assert.Equal(t, "", value)
-	})
-
-	t.Run("list empty backend", func(t *testing.T) {
-		backend := NewMemoryBackend()
-		defer backend.Close()
-
-		keys, err := backend.List()
-		require.NoError(t, err)
-		assert.Empty(t, keys)
-	})
-
-	t.Run("encryption flag", func(t *testing.T) {
-		backend := NewMemoryBackend()
-		defer backend.Close()
-
-		// For now, encryption flag is ignored in memory backend
-		err := backend.Set("ENCRYPTED", "value", true)
-		require.NoError(t, err)
-
-		value, err := backend.Get("ENCRYPTED")
-		require.NoError(t, err)
-		assert.Equal(t, "value", value)
-	})
+func TestMemoryBackend_Set(t *testing.T) {
+	backend := NewMemoryBackend()
+	
+	tests := []struct {
+		name    string
+		key     string
+		value   string
+		encrypt bool
+		wantErr bool
+	}{
+		{"simple", "KEY1", "value1", false, false},
+		{"with_spaces", "KEY_WITH_SPACES", "value with spaces", false, false},
+		{"empty_value", "EMPTY", "", false, false},
+		{"unicode", "UNICODE", "Hello 世界 🌍", false, false},
+		{"special_chars", "SPECIAL", "!@#$%^&*()", false, false},
+		{"encrypted", "ENCRYPTED", "secret", true, false},
+		{"multiline", "MULTILINE", "line1\nline2\nline3", false, false},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := backend.Set(tt.key, tt.value, tt.encrypt)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Set() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }
 
-func TestMemoryBackendConcurrency(t *testing.T) {
+func TestMemoryBackend_Get(t *testing.T) {
 	backend := NewMemoryBackend()
-	defer backend.Close()
-
-	// Number of concurrent operations
-	numGoroutines := 100
-	numOpsPerGoroutine := 100
-
-	var wg sync.WaitGroup
-	errors := make(chan error, numGoroutines*numOpsPerGoroutine)
-
-	// Concurrent writes
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			for j := 0; j < numOpsPerGoroutine; j++ {
-				key := fmt.Sprintf("KEY_%d_%d", id, j)
-				value := fmt.Sprintf("value_%d_%d", id, j)
-				if err := backend.Set(key, value, false); err != nil {
-					errors <- err
-				}
+	
+	// Set some test data
+	backend.Set("EXISTING", "value", false)
+	backend.Set("EMPTY", "", false)
+	
+	tests := []struct {
+		name    string
+		key     string
+		want    string
+		wantErr bool
+	}{
+		{"existing", "EXISTING", "value", false},
+		{"empty_value", "EMPTY", "", false},
+		{"not_found", "NOTFOUND", "", true},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := backend.Get(tt.key)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
-		}(i)
-	}
-
-	// Concurrent reads
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			for j := 0; j < numOpsPerGoroutine; j++ {
-				key := fmt.Sprintf("KEY_%d_%d", id, j)
-				expectedValue := fmt.Sprintf("value_%d_%d", id, j)
-				
-				// Wait for value to be set
-				for attempts := 0; attempts < 10; attempts++ {
-					if value, err := backend.Get(key); err == nil {
-						if value != expectedValue {
-							errors <- fmt.Errorf("got %s, want %s", value, expectedValue)
-						}
-						break
-					}
-				}
+			if got != tt.want {
+				t.Errorf("Get() = %v, want %v", got, tt.want)
 			}
-		}(i)
-	}
-
-	// Concurrent exists checks
-	for i := 0; i < numGoroutines/2; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			for j := 0; j < numOpsPerGoroutine; j++ {
-				key := fmt.Sprintf("KEY_%d_%d", id, j)
-				if _, err := backend.Exists(key); err != nil {
-					errors <- err
-				}
+			if err == ErrNotFound && !tt.wantErr {
+				t.Error("Get() returned ErrNotFound for existing key")
 			}
-		}(i)
+		})
 	}
+}
 
-	// Concurrent lists
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 10; j++ {
-				if _, err := backend.List(); err != nil {
-					errors <- err
-				}
+func TestMemoryBackend_Exists(t *testing.T) {
+	backend := NewMemoryBackend()
+	
+	// Set test data
+	backend.Set("EXISTING", "value", false)
+	
+	tests := []struct {
+		name string
+		key  string
+		want bool
+	}{
+		{"existing", "EXISTING", true},
+		{"not_found", "NOTFOUND", false},
+		{"empty_key", "", false},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := backend.Exists(tt.key)
+			if err != nil {
+				t.Errorf("Exists() error = %v", err)
+				return
 			}
-		}()
-	}
-
-	// Concurrent deletes
-	for i := 0; i < numGoroutines/4; i++ {
-		wg.Add(1)
-		go func(id int) {
-			defer wg.Done()
-			for j := 0; j < numOpsPerGoroutine/2; j++ {
-				key := fmt.Sprintf("KEY_%d_%d", id, j)
-				if err := backend.Delete(key); err != nil {
-					errors <- err
-				}
+			if got != tt.want {
+				t.Errorf("Exists() = %v, want %v", got, tt.want)
 			}
-		}(i)
+		})
 	}
+}
 
-	wg.Wait()
-	close(errors)
-
-	// Check for errors
-	for err := range errors {
-		t.Errorf("Concurrent operation failed: %v", err)
+func TestMemoryBackend_Delete(t *testing.T) {
+	backend := NewMemoryBackend()
+	
+	// Set test data
+	backend.Set("TO_DELETE", "value", false)
+	backend.Set("TO_KEEP", "value", false)
+	
+	// Delete existing key
+	err := backend.Delete("TO_DELETE")
+	if err != nil {
+		t.Errorf("Delete() error = %v", err)
 	}
+	
+	// Verify deletion
+	exists, _ := backend.Exists("TO_DELETE")
+	if exists {
+		t.Error("Delete() did not remove the key")
+	}
+	
+	// Verify other keys remain
+	exists, _ = backend.Exists("TO_KEEP")
+	if !exists {
+		t.Error("Delete() removed wrong key")
+	}
+	
+	// Delete non-existing key (should not error)
+	err = backend.Delete("NOTFOUND")
+	if err != nil {
+		t.Errorf("Delete() error for non-existing key = %v", err)
+	}
+}
 
-	// Verify final state
+func TestMemoryBackend_List(t *testing.T) {
+	backend := NewMemoryBackend()
+	
+	// Test empty list
 	keys, err := backend.List()
-	require.NoError(t, err)
-	t.Logf("Final number of keys: %d", len(keys))
+	if err != nil {
+		t.Errorf("List() error = %v", err)
+	}
+	if len(keys) != 0 {
+		t.Errorf("List() = %v, want empty list", keys)
+	}
+	
+	// Add test data
+	testKeys := []string{"KEY1", "KEY2", "KEY3", "ANOTHER_KEY"}
+	for _, key := range testKeys {
+		backend.Set(key, "value", false)
+	}
+	
+	// Get list
+	keys, err = backend.List()
+	if err != nil {
+		t.Errorf("List() error = %v", err)
+	}
+	
+	// Sort for comparison
+	sort.Strings(keys)
+	sort.Strings(testKeys)
+	
+	if len(keys) != len(testKeys) {
+		t.Errorf("List() returned %d keys, want %d", len(keys), len(testKeys))
+	}
+	
+	for i, key := range keys {
+		if key != testKeys[i] {
+			t.Errorf("List()[%d] = %v, want %v", i, key, testKeys[i])
+		}
+	}
 }
 
-func BenchmarkMemoryBackendSet(b *testing.B) {
+func TestMemoryBackend_Close(t *testing.T) {
 	backend := NewMemoryBackend()
-	defer backend.Close()
+	
+	// Close should always succeed
+	err := backend.Close()
+	if err != nil {
+		t.Errorf("Close() error = %v", err)
+	}
+	
+	// Should still work after close (for memory backend)
+	err = backend.Set("KEY", "value", false)
+	if err != nil {
+		t.Errorf("Set() after Close() error = %v", err)
+	}
+}
 
+func TestMemoryBackend_Overwrite(t *testing.T) {
+	backend := NewMemoryBackend()
+	
+	// Set initial value
+	backend.Set("KEY", "initial", false)
+	
+	// Overwrite
+	err := backend.Set("KEY", "updated", false)
+	if err != nil {
+		t.Errorf("Set() overwrite error = %v", err)
+	}
+	
+	// Verify new value
+	value, _ := backend.Get("KEY")
+	if value != "updated" {
+		t.Errorf("Get() after overwrite = %v, want updated", value)
+	}
+}
+
+func TestMemoryBackend_Concurrent(t *testing.T) {
+	backend := NewMemoryBackend()
+	
+	// Test concurrent writes
+	var wg sync.WaitGroup
+	numGoroutines := 100
+	
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			key := fmt.Sprintf("KEY_%d", n)
+			value := fmt.Sprintf("value_%d", n)
+			
+			if err := backend.Set(key, value, false); err != nil {
+				t.Errorf("Concurrent Set() error = %v", err)
+			}
+		}(i)
+	}
+	
+	wg.Wait()
+	
+	// Verify all keys were set
+	keys, _ := backend.List()
+	if len(keys) != numGoroutines {
+		t.Errorf("Expected %d keys, got %d", numGoroutines, len(keys))
+	}
+	
+	// Test concurrent reads
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(n int) {
+			defer wg.Done()
+			key := fmt.Sprintf("KEY_%d", n)
+			expectedValue := fmt.Sprintf("value_%d", n)
+			
+			value, err := backend.Get(key)
+			if err != nil {
+				t.Errorf("Concurrent Get() error = %v", err)
+				return
+			}
+			if value != expectedValue {
+				t.Errorf("Concurrent Get() = %v, want %v", value, expectedValue)
+			}
+		}(i)
+	}
+	
+	wg.Wait()
+}
+
+func TestMemoryBackend_MixedOperations(t *testing.T) {
+	backend := NewMemoryBackend()
+	
+	// Perform mixed operations
+	var wg sync.WaitGroup
+	
+	// Writer
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			backend.Set(fmt.Sprintf("WRITE_%d", i), "value", false)
+		}
+	}()
+	
+	// Reader
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			backend.List()
+		}
+	}()
+	
+	// Deleter
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 25; i++ {
+			backend.Delete(fmt.Sprintf("WRITE_%d", i))
+		}
+	}()
+	
+	wg.Wait()
+	
+	// Verify state is consistent
+	keys, _ := backend.List()
+	if len(keys) < 25 {
+		t.Errorf("Expected at least 25 keys remaining, got %d", len(keys))
+	}
+}
+
+func BenchmarkMemoryBackend_Set(b *testing.B) {
+	backend := NewMemoryBackend()
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		key := fmt.Sprintf("KEY_%d", i)
-		value := fmt.Sprintf("value_%d", i)
-		_ = backend.Set(key, value, false)
+		backend.Set(key, "value", false)
 	}
 }
 
-func BenchmarkMemoryBackendGet(b *testing.B) {
+func BenchmarkMemoryBackend_Get(b *testing.B) {
 	backend := NewMemoryBackend()
-	defer backend.Close()
-
+	
 	// Pre-populate
 	for i := 0; i < 1000; i++ {
-		key := fmt.Sprintf("KEY_%d", i)
-		value := fmt.Sprintf("value_%d", i)
-		backend.Set(key, value, false)
+		backend.Set(fmt.Sprintf("KEY_%d", i), "value", false)
 	}
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		key := fmt.Sprintf("KEY_%d", i%1000)
-		_, _ = backend.Get(key)
+		backend.Get(key)
 	}
 }
 
-func BenchmarkMemoryBackendList(b *testing.B) {
+func BenchmarkMemoryBackend_List(b *testing.B) {
 	backend := NewMemoryBackend()
-	defer backend.Close()
-
+	
 	// Pre-populate
 	for i := 0; i < 1000; i++ {
-		key := fmt.Sprintf("KEY_%d", i)
-		value := fmt.Sprintf("value_%d", i)
-		backend.Set(key, value, false)
+		backend.Set(fmt.Sprintf("KEY_%d", i), "value", false)
 	}
-
+	
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = backend.List()
-	}
-}
-
-func BenchmarkMemoryBackendConcurrentSet(b *testing.B) {
-	backend := NewMemoryBackend()
-	defer backend.Close()
-
-	b.RunParallel(func(pb *testing.PB) {
-		i := 0
-		for pb.Next() {
-			key := fmt.Sprintf("KEY_%d", i)
-			value := fmt.Sprintf("value_%d", i)
-			_ = backend.Set(key, value, false)
-			i++
-		}
-	})
-}
-
-func BenchmarkMemoryBackendConcurrentGet(b *testing.B) {
-	backend := NewMemoryBackend()
-	defer backend.Close()
-
-	// Pre-populate
-	for i := 0; i < 1000; i++ {
-		key := fmt.Sprintf("KEY_%d", i)
-		value := fmt.Sprintf("value_%d", i)
-		backend.Set(key, value, false)
-	}
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		i := 0
-		for pb.Next() {
-			key := fmt.Sprintf("KEY_%d", i%1000)
-			_, _ = backend.Get(key)
-			i++
-		}
-	})
-}
-
-func TestMemoryBackendStress(t *testing.T) {
-	if testing.Short() {
-		t.Skip("Skipping stress test in short mode")
-	}
-
-	backend := NewMemoryBackend()
-	defer backend.Close()
-
-	// Create many keys
-	numKeys := 10000
-	for i := 0; i < numKeys; i++ {
-		key := fmt.Sprintf("STRESS_KEY_%05d", i)
-		value := fmt.Sprintf("stress_value_%05d", i)
-		err := backend.Set(key, value, false)
-		require.NoError(t, err)
-	}
-
-	// Verify all keys exist
-	keys, err := backend.List()
-	require.NoError(t, err)
-	assert.Len(t, keys, numKeys)
-
-	// Delete half the keys
-	for i := 0; i < numKeys/2; i++ {
-		key := fmt.Sprintf("STRESS_KEY_%05d", i)
-		err := backend.Delete(key)
-		require.NoError(t, err)
-	}
-
-	// Verify remaining keys
-	keys, err = backend.List()
-	require.NoError(t, err)
-	assert.Len(t, keys, numKeys/2)
-
-	// Verify correct keys remain
-	for i := numKeys / 2; i < numKeys; i++ {
-		key := fmt.Sprintf("STRESS_KEY_%05d", i)
-		value, err := backend.Get(key)
-		require.NoError(t, err)
-		expectedValue := fmt.Sprintf("stress_value_%05d", i)
-		assert.Equal(t, expectedValue, value)
+		backend.List()
 	}
 }

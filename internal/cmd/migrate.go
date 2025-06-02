@@ -28,6 +28,9 @@ func newMigrateCommand() *cobra.Command {
 		Example: `  # Migrate from file to SQLite storage
   vaultenv migrate --from file --to sqlite
   
+  # Migrate from file to Git storage
+  vaultenv migrate --from file --to git
+  
   # Migrate specific environment
   vaultenv migrate --from file --to sqlite --env production
   
@@ -42,8 +45,8 @@ func newMigrateCommand() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&fromType, "from", "", "source storage type (file, sqlite)")
-	cmd.Flags().StringVar(&toType, "to", "", "destination storage type (file, sqlite)")
+	cmd.Flags().StringVar(&fromType, "from", "", "source storage type (file, sqlite, git)")
+	cmd.Flags().StringVar(&toType, "to", "", "destination storage type (file, sqlite, git)")
 	cmd.Flags().StringVarP(&environment, "env", "e", "development", "environment to migrate")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "skip confirmation prompt")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be migrated without making changes")
@@ -108,7 +111,7 @@ func runMigrate(fromType, toType, environment string, force, dryRun bool) error 
 			return fmt.Errorf("failed to initialize keystore: %w", err)
 		}
 		
-		pm := auth.NewPasswordManager(ks)
+		pm := auth.NewPasswordManager(ks, cfg)
 
 		// Get or create encryption key
 		key, err := pm.GetOrCreateMasterKey(cfg.Project.ID)
@@ -202,8 +205,9 @@ func runMigrate(fromType, toType, environment string, force, dryRun bool) error 
 	ui.Success("\n✅ Successfully migrated %d variables from %s to %s storage", 
 		migrated, fromType, toType)
 
-	// Show additional information for SQLite
-	if toType == "sqlite" {
+	// Show additional information based on storage type
+	switch toType {
+	case "sqlite":
 		ui.Info("\nSQLite features now available:")
 		fmt.Println("  • Version history tracking")
 		fmt.Println("  • Audit logging")
@@ -211,6 +215,17 @@ func runMigrate(fromType, toType, environment string, force, dryRun bool) error 
 		fmt.Println("\nTry these commands:")
 		fmt.Printf("  vaultenv history <KEY> --env %s\n", environment)
 		fmt.Printf("  vaultenv audit --env %s\n", environment)
+	
+	case "git":
+		ui.Info("\nGit storage features now available:")
+		fmt.Println("  • Each variable stored in a separate file")
+		fmt.Println("  • Git-friendly directory structure")
+		fmt.Println("  • Minimal merge conflicts")
+		fmt.Println("  • Easy to track changes with git diff")
+		fmt.Println("\nNext steps:")
+		fmt.Println("  1. Run 'vaultenv git init' to set up Git integration")
+		fmt.Println("  2. Add .vaultenv/git/ to your repository")
+		fmt.Println("  3. Commit your encrypted secrets")
 	}
 
 	return nil

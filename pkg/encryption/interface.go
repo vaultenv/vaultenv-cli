@@ -20,6 +20,12 @@ type Encryptor interface {
 	// Decrypt decrypts ciphertext using the provided key
 	Decrypt(ciphertext []byte, key []byte) ([]byte, error)
 
+	// EncryptString encrypts a string and returns base64-encoded result
+	EncryptString(plaintext string, key []byte) (string, error)
+
+	// DecryptString decrypts a base64-encoded string
+	DecryptString(ciphertext string, key []byte) (string, error)
+
 	// GenerateKey derives an encryption key from a password
 	GenerateKey(password string, salt []byte) []byte
 
@@ -51,6 +57,8 @@ func NewEncryptor(algorithm string) (Encryptor, error) {
 	switch algorithm {
 	case "aes-gcm-256":
 		return NewAESGCMEncryptor(), nil
+	case "aes-gcm-256-deterministic":
+		return NewDeterministicEncryptor(), nil
 	case "chacha20-poly1305":
 		return NewChaChaEncryptor(), nil
 	default:

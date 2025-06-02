@@ -31,6 +31,20 @@ type KeyEntry struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+// EnvironmentKeyEntry represents a stored encryption key for a specific environment
+type EnvironmentKeyEntry struct {
+	ProjectID        string    `json:"project_id"`
+	Environment      string    `json:"environment"`
+	Salt             []byte    `json:"salt"`
+	VerificationHash string    `json:"verification_hash"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	Algorithm        string    `json:"algorithm"`
+	Iterations       uint32    `json:"iterations"`
+	Memory           uint32    `json:"memory"`
+	Parallelism      uint8     `json:"parallelism"`
+}
+
 // Keystore manages encryption keys
 type Keystore struct {
 	db     *sql.DB
@@ -246,6 +260,12 @@ func (ks *Keystore) initSchema() error {
 		}
 	}
 	
+	if currentVersion < 2 {
+		if err := ks.applyMigration2(); err != nil {
+			return fmt.Errorf("failed to apply migration 2: %w", err)
+		}
+	}
+	
 	return nil
 }
 
@@ -282,4 +302,137 @@ func (ks *Keystore) applyMigration1() error {
 	}
 	
 	return tx.Commit()
+}
+
+// applyMigration2 adds support for per-environment keys
+func (ks *Keystore) applyMigration2() error {
+	tx, err := ks.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	
+	// Create environment_keys table
+	envKeysTable := `
+		CREATE TABLE environment_keys (
+			project_id TEXT NOT NULL,
+			environment TEXT NOT NULL,
+			data BLOB NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (project_id, environment)
+		)
+	`
+	
+	if _, err := tx.Exec(envKeysTable); err != nil {
+		return err
+	}
+	
+	// Create indexes
+	if _, err := tx.Exec("CREATE INDEX idx_env_keys_project ON environment_keys(project_id)"); err != nil {
+		return err
+	}
+	
+	if _, err := tx.Exec("CREATE INDEX idx_env_keys_updated ON environment_keys(updated_at)"); err != nil {
+		return err
+	}
+	
+	// Record migration
+	if _, err := tx.Exec("INSERT INTO schema_version (version) VALUES (2)"); err != nil {
+		return err
+	}
+	
+	return tx.Commit()
+}
+
+// StoreEnvironmentKey stores an encryption key for a specific environment
+func (ks *Keystore) StoreEnvironmentKey(projectID, environment string, entry *EnvironmentKeyEntry) error {
+	entry.UpdatedAt = time.Now()
+	
+	// Serialize entry to JSON
+	data, err := json.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("failed to serialize key entry: %w", err)
+	}
+	
+	// Insert or replace
+	query := `
+		INSERT OR REPLACE INTO environment_keys (project_id, environment, data, updated_at)
+		VALUES (?, ?, ?, ?)
+	`
+	
+	_, err = ks.db.Exec(query, projectID, environment, data, entry.UpdatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to store environment key: %w", err)
+	}
+	
+	return nil
+}
+
+// GetEnvironmentKey retrieves an encryption key for a specific environment
+func (ks *Keystore) GetEnvironmentKey(projectID, environment string) (*EnvironmentKeyEntry, error) {
+	query := `SELECT data FROM environment_keys WHERE project_id = ? AND environment = ?`
+	
+	var data []byte
+	err := ks.db.QueryRow(query, projectID, environment).Scan(&data)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, ErrKeyNotFound
+		}
+		return nil, fmt.Errorf("failed to get environment key: %w", err)
+	}
+	
+	var entry EnvironmentKeyEntry
+	if err := json.Unmarshal(data, &entry); err != nil {
+		return nil, fmt.Errorf("failed to deserialize key entry: %w", err)
+	}
+	
+	return &entry, nil
+}
+
+// DeleteEnvironmentKey removes an encryption key for a specific environment
+func (ks *Keystore) DeleteEnvironmentKey(projectID, environment string) error {
+	query := `DELETE FROM environment_keys WHERE project_id = ? AND environment = ?`
+	
+	result, err := ks.db.Exec(query, projectID, environment)
+	if err != nil {
+		return fmt.Errorf("failed to delete environment key: %w", err)
+	}
+	
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+	
+	if rowsAffected == 0 {
+		return ErrKeyNotFound
+	}
+	
+	return nil
+}
+
+// ListEnvironments returns all environments for a project that have stored keys
+func (ks *Keystore) ListEnvironments(projectID string) ([]string, error) {
+	query := `SELECT environment FROM environment_keys WHERE project_id = ? ORDER BY environment`
+	
+	rows, err := ks.db.Query(query, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list environments: %w", err)
+	}
+	defer rows.Close()
+	
+	var environments []string
+	for rows.Next() {
+		var environment string
+		if err := rows.Scan(&environment); err != nil {
+			return nil, fmt.Errorf("failed to scan environment: %w", err)
+		}
+		environments = append(environments, environment)
+	}
+	
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate environments: %w", err)
+		}
+	
+	return environments, nil
 }

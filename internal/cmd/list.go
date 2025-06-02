@@ -111,7 +111,7 @@ func runList(cmd *cobra.Command, environment string, showValues bool, pattern st
                 }
 
                 // Create password manager
-                pm := auth.NewPasswordManager(ks)
+                pm := auth.NewPasswordManager(ks, cfg)
 
                 // Get or create encryption key
                 key, err := pm.GetOrCreateMasterKey(projectID)

@@ -1,3 +1,0 @@
-{
-  "DATABASE_URL": "{\"algorithm\":\"aes-gcm-256\",\"version\":1,\"salt\":\"ASxKQq9svGtw8EF3JK4W7Vi2+wIl9DcGqxv5v/GAFkE=\",\"nonce\":\"\",\"ciphertext\":\"flFJfpWRg98+TWPA0legR9re8aeuRbylGSQHAgSNT5o4vNkExFIWFUTbCPkJm3n89/VYeIT2Rpg=\",\"created_at\":1748796951,\"is_encrypted\":true}"
-}

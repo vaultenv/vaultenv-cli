@@ -153,3 +153,35 @@ func (e *AESGCMEncryptor) DecryptString(ciphertext string, key []byte) (string, 
 
 	return string(plaintext), nil
 }
+
+// EncryptWithNonce encrypts plaintext using AES-256-GCM with a specific nonce
+// This is used by DeterministicEncryptor to provide consistent encryption
+func (e *AESGCMEncryptor) EncryptWithNonce(plaintext []byte, key []byte, nonce []byte) ([]byte, error) {
+	// Validate key length
+	if len(key) != 32 {
+		return nil, ErrInvalidKey
+	}
+
+	// Create cipher block
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	// Create GCM mode
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	// Validate nonce size
+	if len(nonce) != gcm.NonceSize() {
+		return nil, fmt.Errorf("invalid nonce size: got %d, want %d", len(nonce), gcm.NonceSize())
+	}
+
+	// Encrypt data
+	// Prepend nonce to ciphertext for storage (same format as regular Encrypt)
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+
+	return ciphertext, nil
+}

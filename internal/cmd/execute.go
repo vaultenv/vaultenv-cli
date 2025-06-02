@@ -179,6 +179,18 @@ func NewRootCommand() *cobra.Command {
     cmd.AddCommand(newHistoryCommand())
     cmd.AddCommand(newAuditCommand())
     cmd.AddCommand(newMigrateCommand())
+    cmd.AddCommand(newGitCommand())
+    cmd.AddCommand(newEnvCommand())
+    cmd.AddCommand(newLoadCommand())
+    cmd.AddCommand(newExportCommand())
+    cmd.AddCommand(newBatchCommand())
+    cmd.AddCommand(newConfigCommand())
+    
+    // Add command aliases for better UX
+    addAliases(cmd)
+    
+    // Add alias help
+    AddShortHelp(cmd)
 
     return cmd
 }
@@ -260,6 +272,18 @@ func addCommands() {
     rootCmd.AddCommand(newHistoryCommand())
     rootCmd.AddCommand(newAuditCommand())
     rootCmd.AddCommand(newMigrateCommand())
+    rootCmd.AddCommand(newGitCommand())
+    rootCmd.AddCommand(newEnvCommand())
+    rootCmd.AddCommand(newLoadCommand())
+    rootCmd.AddCommand(newExportCommand())
+    rootCmd.AddCommand(newBatchCommand())
+    rootCmd.AddCommand(newConfigCommand())
+    
+    // Add command aliases for better UX
+    addAliases(rootCmd)
+    
+    // Add alias help
+    AddShortHelp(rootCmd)
 }
 
 // loadProjectConfig loads the project configuration

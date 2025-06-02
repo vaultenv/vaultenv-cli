@@ -1,55 +1,159 @@
-# .golangci.yml
-# This configuration ensures consistent code quality across all contributors
-
 run:
-  # Timeout for analysis
   timeout: 5m
-
-  # Include test files in analysis
   tests: true
-
-  # Skip generated files
+  build-tags:
+    - integration
   skip-dirs:
     - vendor
-    - third_party
+    - node_modules
+  skip-files:
+    - ".*_test.go"
 
 linters:
-  enable-all: true
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - exhaustive
+    - funlen
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - gomnd
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - interfacer
+    - lll
+    - misspell
+    - nakedret
+    - noctx
+    - nolintlint
+    - rowserrcheck
+    - scopelint
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+    - gocognit
+    - godot
+    - godox
+    - goerr113
+    - nestif
+    - prealloc
+    - testpackage
+    - revive
+    - wsl
+
   disable:
-    # These linters are too opinionated for a community project
-    - exhaustruct # Requires all struct fields to be initialized
-    - depguard # Restricts which packages can be imported
-    - gochecknoglobals # We need some globals for version info
-    - gochecknoinits # Init functions are sometimes necessary
-    - wsl # Whitespace linter is too strict
-    - nlreturn # Newline requirements are too strict
-    - varnamelen # Short variable names are fine in small scopes
+    - maligned
+    - gochecknoglobals
 
 linters-settings:
-  # Configure specific linters
-  lll:
-    line-length: 120 # Reasonable line length for modern monitors
-
-  misspell:
-    locale: US
-
+  dupl:
+    threshold: 100
+  
+  funlen:
+    lines: 100
+    statements: 50
+  
+  gci:
+    local-prefixes: github.com/vaultenv/vaultenv-cli
+  
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - whyNoLint
+      - wrapperFunc
+  
+  gocyclo:
+    min-complexity: 15
+  
   goimports:
     local-prefixes: github.com/vaultenv/vaultenv-cli
-
+  
+  golint:
+    min-confidence: 0
+  
+  gomnd:
+    settings:
+      mnd:
+        checks: argument,case,condition,return
+  
   govet:
     check-shadowing: true
-
-  revive:
-    rules:
-      - name: var-naming
-        disabled: true # Allow acronyms like URL, API
+  
+  lll:
+    line-length: 140
+  
+  misspell:
+    locale: US
+  
+  nolintlint:
+    allow-leading-space: true
+    allow-unused: false
+    require-explanation: false
+    require-specific: false
+  
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  
+  gosec:
+    excludes:
+      - G101 # Potential hardcoded credentials
+      - G304 # Potential file inclusion via variable
+  
+  nestif:
+    min-complexity: 4
+  
+  godot:
+    scope: declarations
+    capital: true
 
 issues:
-  # Don't hide multiple issues from the same linter
-  max-issues-per-linter: 0
-
-  # Show all issues
-  max-same-issues: 0
-
-  # Be strict in new code, lenient with existing code
-  new: true
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gomnd
+        - funlen
+        - dupl
+        - gosec
+    
+    - path: cmd/
+      linters:
+        - gochecknoinits
+    
+    - path: internal/cmd/
+      linters:
+        - funlen
+    
+    - linters:
+        - lll
+      source: "^//go:generate "

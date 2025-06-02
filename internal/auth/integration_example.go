@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/vaultenv/vaultenv-cli/internal/config"
 	"github.com/vaultenv/vaultenv-cli/internal/keystore"
 )
 
@@ -19,8 +20,16 @@ func InitializeAuth(dataDir, projectID string) (*PasswordManager, error) {
 		return nil, fmt.Errorf("failed to create keystore: %w", err)
 	}
 	
+	// Load or create default config
+	cfg, err := config.Load()
+	if err != nil {
+		// Create default config if none exists
+		cfg = config.DefaultConfig()
+		cfg.Project.ID = projectID
+	}
+	
 	// Create password manager
-	pm := NewPasswordManager(ks)
+	pm := NewPasswordManager(ks, cfg)
 	
 	return pm, nil
 }

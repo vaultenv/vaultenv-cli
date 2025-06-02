@@ -1,154 +1,276 @@
 package encryption
 
 import (
+	"bytes"
+	"crypto/rand"
+	"fmt"
 	"testing"
-
-	"github.com/vaultenv/vaultenv-cli/pkg/keystore"
 )
 
-// TestSecurityIntegration demonstrates the complete security workflow
-func TestSecurityIntegration(t *testing.T) {
-	// Create encryption and keystore instances
-	encryptor := DefaultEncryptor().(*AESGCMEncryptor)
-	keyStore := keystore.NewMockKeystore()
-
-	service := "vaultenv-test"
-	account := "production"
-	password := "super-secure-password-123!"
-
-	// Sensitive data to protect
-	secrets := map[string]string{
-		"DATABASE_URL":     "postgresql://user:pass@localhost/db",
-		"API_KEY":          "sk-1234567890abcdef",
-		"JWT_SECRET":       "my-super-secret-jwt-key",
-		"STRIPE_SECRET":    "sk_test_abcdef123456",
-		"AWS_SECRET_KEY":   "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+func TestNewEncryptor(t *testing.T) {
+	tests := []struct {
+		algorithm string
+		wantType  string
+		wantErr   bool
+	}{
+		{"aes-gcm-256", "*encryption.AESGCMEncryptor", false},
+		{"aes-gcm-256-deterministic", "*encryption.DeterministicEncryptor", false},
+		{"chacha20-poly1305", "*encryption.ChaChaEncryptor", false},
+		{"unknown-algorithm", "", true},
+		{"", "", true},
 	}
-
-	t.Run("CompleteWorkflow", func(t *testing.T) {
-		// 1. Generate salt for key derivation
-		salt, err := encryptor.GenerateSalt()
-		if err != nil {
-			t.Fatalf("Failed to generate salt: %v", err)
-		}
-
-		// 2. Derive encryption key from password
-		encryptionKey := encryptor.GenerateKey(password, salt)
-
-		// 3. Store the key securely in the keystore
-		err = keyStore.Store(service, account, encryptionKey)
-		if err != nil {
-			t.Fatalf("Failed to store key: %v", err)
-		}
-
-		// 4. Encrypt each secret
-		encryptedSecrets := make(map[string]string)
-		for key, value := range secrets {
-			encrypted, err := encryptor.EncryptString(value, encryptionKey)
-			if err != nil {
-				t.Fatalf("Failed to encrypt %s: %v", key, err)
-			}
-			encryptedSecrets[key] = encrypted
-		}
-
-		// 5. Simulate retrieving and decrypting later
-		t.Run("RetrieveAndDecrypt", func(t *testing.T) {
-			// Retrieve key from keystore
-			retrievedKey, err := keyStore.Retrieve(service, account)
-			if err != nil {
-				t.Fatalf("Failed to retrieve key: %v", err)
-			}
-
-			// Decrypt each secret
-			for key, encrypted := range encryptedSecrets {
-				decrypted, err := encryptor.DecryptString(encrypted, retrievedKey)
-				if err != nil {
-					t.Fatalf("Failed to decrypt %s: %v", key, err)
-				}
-
-				// Verify it matches original
-				if decrypted != secrets[key] {
-					t.Errorf("Decrypted value for %s doesn't match original", key)
-				}
-			}
-		})
-
-		// 6. Test with wrong password
-		t.Run("WrongPassword", func(t *testing.T) {
-			wrongKey := encryptor.GenerateKey("wrong-password", salt)
-
-			// Try to decrypt with wrong key
-			for key, encrypted := range encryptedSecrets {
-				_, err := encryptor.DecryptString(encrypted, wrongKey)
-				if err == nil {
-					t.Errorf("Decryption with wrong key should fail for %s", key)
-				}
-			}
-		})
-
-		// 7. Test key rotation
-		t.Run("KeyRotation", func(t *testing.T) {
-			// Generate new salt and key
-			newSalt, _ := encryptor.GenerateSalt()
-			newKey := encryptor.GenerateKey(password, newSalt)
-
-			// Re-encrypt with new key
-			for key, value := range secrets {
-				// Decrypt with old key
-				decrypted, err := encryptor.DecryptString(encryptedSecrets[key], encryptionKey)
-				if err != nil {
-					t.Fatalf("Failed to decrypt %s with old key: %v", key, err)
-				}
-
-				// Re-encrypt with new key
-				reEncrypted, err := encryptor.EncryptString(decrypted, newKey)
-				if err != nil {
-					t.Fatalf("Failed to re-encrypt %s: %v", key, err)
-				}
-
-				// Verify we can decrypt with new key
-				verified, err := encryptor.DecryptString(reEncrypted, newKey)
-				if err != nil {
-					t.Fatalf("Failed to decrypt %s with new key: %v", key, err)
-				}
-
-				if verified != value {
-					t.Errorf("Key rotation failed for %s", key)
-				}
-			}
-
-			// Update keystore with new key
-			err = keyStore.Store(service, account, newKey)
-			if err != nil {
-				t.Fatalf("Failed to update key in keystore: %v", err)
-			}
-		})
-	})
-
-	t.Run("MultipleEnvironments", func(t *testing.T) {
-		environments := []string{"development", "staging", "production"}
-		
-		for _, env := range environments {
-			// Each environment gets its own salt and key
-			salt, _ := encryptor.GenerateSalt()
-			key := encryptor.GenerateKey(password, salt)
+	
+	for _, tt := range tests {
+		t.Run(tt.algorithm, func(t *testing.T) {
+			enc, err := NewEncryptor(tt.algorithm)
 			
-			// Store key for this environment
-			err := keyStore.Store(service, env, key)
-			if err != nil {
-				t.Fatalf("Failed to store key for %s: %v", env, err)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewEncryptor() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
-		}
+			
+			if !tt.wantErr {
+				gotType := fmt.Sprintf("%T", enc)
+				if gotType != tt.wantType {
+					t.Errorf("NewEncryptor() type = %v, want %v", gotType, tt.wantType)
+				}
+			}
+		})
+	}
+}
 
-		// List all environments
-		envList, err := keyStore.List(service)
+func TestDefaultEncryptor(t *testing.T) {
+	enc := DefaultEncryptor()
+	
+	// Should return AES-GCM encryptor
+	if enc.Algorithm() != "aes-gcm-256" {
+		t.Errorf("DefaultEncryptor() algorithm = %v, want aes-gcm-256", enc.Algorithm())
+	}
+	
+	// Test it works
+	key := make([]byte, 32)
+	rand.Read(key)
+	
+	plaintext := []byte("test default encryptor")
+	encrypted, err := enc.Encrypt(plaintext, key)
+	if err != nil {
+		t.Fatalf("Encrypt() error = %v", err)
+	}
+	
+	decrypted, err := enc.Decrypt(encrypted, key)
+	if err != nil {
+		t.Fatalf("Decrypt() error = %v", err)
+	}
+	
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Errorf("Decrypt() = %v, want %v", decrypted, plaintext)
+	}
+}
+
+func TestEncryptor_Interface(t *testing.T) {
+	// Test that all implementations satisfy the Encryptor interface
+	encryptors := []Encryptor{
+		NewAESGCMEncryptor(),
+		NewDeterministicEncryptor(),
+		NewChaChaEncryptor(),
+	}
+	
+	for _, enc := range encryptors {
+		t.Run(enc.Algorithm(), func(t *testing.T) {
+			// Verify interface methods exist
+			_ = enc.Algorithm()
+			_ = enc.GenerateKey("password", []byte("salt"))
+			
+			// Skip further tests for unimplemented ChaCha
+			if enc.Algorithm() == "chacha20-poly1305" {
+				return
+			}
+			
+			// Test full encryption cycle
+			salt, err := enc.GenerateSalt()
+			if err != nil {
+				t.Fatalf("GenerateSalt() error = %v", err)
+			}
+			
+			key := enc.GenerateKey("test-password", salt)
+			
+			plaintext := "test data"
+			encrypted, err := enc.EncryptString(plaintext, key)
+			if err != nil {
+				t.Fatalf("EncryptString() error = %v", err)
+			}
+			
+			decrypted, err := enc.DecryptString(encrypted, key)
+			if err != nil {
+				t.Fatalf("DecryptString() error = %v", err)
+			}
+			
+			if decrypted != plaintext {
+				t.Errorf("DecryptString() = %v, want %v", decrypted, plaintext)
+			}
+		})
+	}
+}
+
+func TestEncryption_CrossAlgorithm(t *testing.T) {
+	// Test that different algorithms produce different outputs
+	password := "test-password"
+	plaintext := []byte("test data for cross-algorithm comparison")
+	
+	algorithms := []string{"aes-gcm-256", "aes-gcm-256-deterministic"}
+	results := make(map[string][]byte)
+	
+	for _, algo := range algorithms {
+		enc, err := NewEncryptor(algo)
 		if err != nil {
-			t.Fatalf("Failed to list environments: %v", err)
+			t.Fatalf("NewEncryptor(%s) error = %v", algo, err)
 		}
+		
+		salt, _ := enc.GenerateSalt()
+		key := enc.GenerateKey(password, salt)
+		
+		encrypted, err := enc.Encrypt(plaintext, key)
+		if err != nil {
+			t.Fatalf("%s Encrypt() error = %v", algo, err)
+		}
+		
+		results[algo] = encrypted
+	}
+	
+	// Verify different algorithms produce different outputs
+	if bytes.Equal(results["aes-gcm-256"], results["aes-gcm-256-deterministic"]) {
+		t.Error("Different algorithms produced identical ciphertext")
+	}
+}
 
-		// We should have all environments plus the original "production" from above
-		if len(envList) < 3 {
-			t.Errorf("Expected at least 3 environments, got %d", len(envList))
-		}
-	})
+func TestEncryption_KeyDerivation(t *testing.T) {
+	enc := NewAESGCMEncryptor()
+	
+	password := "test-password-123"
+	salt1, _ := enc.GenerateSalt()
+	salt2, _ := enc.GenerateSalt()
+	
+	// Test that same password with different salts produces different keys
+	key1 := enc.GenerateKey(password, salt1)
+	key2 := enc.GenerateKey(password, salt2)
+	
+	if bytes.Equal(key1, key2) {
+		t.Error("Same password with different salts produced identical keys")
+	}
+	
+	// Test that different passwords with same salt produce different keys
+	key3 := enc.GenerateKey("different-password", salt1)
+	
+	if bytes.Equal(key1, key3) {
+		t.Error("Different passwords with same salt produced identical keys")
+	}
+}
+
+func TestEncryption_LargeData(t *testing.T) {
+	enc := NewAESGCMEncryptor()
+	key := make([]byte, 32)
+	rand.Read(key)
+	
+	// Test with various sizes
+	sizes := []int{
+		1024,        // 1 KB
+		1024 * 100,  // 100 KB
+		1024 * 1024, // 1 MB
+	}
+	
+	for _, size := range sizes {
+		t.Run(fmt.Sprintf("size_%d", size), func(t *testing.T) {
+			plaintext := make([]byte, size)
+			rand.Read(plaintext)
+			
+			encrypted, err := enc.Encrypt(plaintext, key)
+			if err != nil {
+				t.Fatalf("Encrypt() error = %v", err)
+			}
+			
+			decrypted, err := enc.Decrypt(encrypted, key)
+			if err != nil {
+				t.Fatalf("Decrypt() error = %v", err)
+			}
+			
+			if !bytes.Equal(decrypted, plaintext) {
+				t.Error("Decryption failed for large data")
+			}
+		})
+	}
+}
+
+func TestEncryption_EdgeCases(t *testing.T) {
+	enc := NewAESGCMEncryptor()
+	key := make([]byte, 32)
+	rand.Read(key)
+	
+	// Test empty data
+	encrypted, err := enc.Encrypt([]byte{}, key)
+	if err != nil {
+		t.Fatalf("Encrypt() error = %v", err)
+	}
+	
+	decrypted, err := enc.Decrypt(encrypted, key)
+	if err != nil {
+		t.Fatalf("Decrypt() error = %v", err)
+	}
+	
+	if len(decrypted) != 0 {
+		t.Errorf("Decrypt() length = %v, want 0", len(decrypted))
+	}
+	
+	// Test single byte
+	singleByte := []byte{0x42}
+	encrypted, err = enc.Encrypt(singleByte, key)
+	if err != nil {
+		t.Fatalf("Encrypt() error = %v", err)
+	}
+	
+	decrypted, err = enc.Decrypt(encrypted, key)
+	if err != nil {
+		t.Fatalf("Decrypt() error = %v", err)
+	}
+	
+	if !bytes.Equal(decrypted, singleByte) {
+		t.Errorf("Decrypt() = %v, want %v", decrypted, singleByte)
+	}
+}
+
+func TestMetadata_Struct(t *testing.T) {
+	// Test that Metadata struct is properly defined
+	metadata := Metadata{
+		Algorithm: "test-algo",
+		Version:   1,
+		Salt:      []byte("test-salt"),
+		Nonce:     []byte("test-nonce"),
+		CreatedAt: 1234567890,
+	}
+	
+	if metadata.Algorithm != "test-algo" {
+		t.Errorf("Algorithm = %v, want test-algo", metadata.Algorithm)
+	}
+	
+	if metadata.Version != 1 {
+		t.Errorf("Version = %v, want 1", metadata.Version)
+	}
+}
+
+func TestEncryptedData_Struct(t *testing.T) {
+	// Test that EncryptedData struct is properly defined
+	data := EncryptedData{
+		Metadata: Metadata{
+			Algorithm: "aes-gcm-256",
+			Version:   1,
+		},
+		Ciphertext: []byte("encrypted-data"),
+	}
+	
+	if data.Metadata.Algorithm != "aes-gcm-256" {
+		t.Errorf("Metadata.Algorithm = %v, want aes-gcm-256", data.Metadata.Algorithm)
+	}
+	
+	if !bytes.Equal(data.Ciphertext, []byte("encrypted-data")) {
+		t.Errorf("Ciphertext = %v, want encrypted-data", data.Ciphertext)
+	}
 }

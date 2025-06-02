@@ -1,15 +1,17 @@
 package ui
 
 import (
-    "fmt"
-    "io"
-    "os"
-    "strings"
-    "time"
+	"bufio"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+	"time"
 
-    "github.com/fatih/color"
-    "github.com/briandowns/spinner"
-    "github.com/spf13/viper"
+	"github.com/briandowns/spinner"
+	"github.com/fatih/color"
+	"github.com/spf13/viper"
+	"golang.org/x/term"
 )
 
 // Color scheme for consistent output
@@ -77,11 +79,6 @@ func Header(text string) {
     headerColor.Fprintln(stdout, strings.Repeat("─", len(text)))
 }
 
-// Progress indicator for longer operations
-type ProgressIndicator struct {
-    spinner *spinner.Spinner
-    message string
-}
 
 // StartProgress begins showing a progress indicator
 func StartProgress(message string, work func() error) error {
@@ -208,4 +205,74 @@ func supportsUnicode() bool {
 
     // Basic check - can be improved
     return strings.Contains(lang, "UTF-8") || strings.Contains(lang, "utf8")
+}
+
+// Select presents a list of options and returns the selected index
+func Select(prompt string, options []string) int {
+    fmt.Fprintln(stdout, prompt)
+    for i, option := range options {
+        fmt.Fprintf(stdout, "%d) %s\n", i+1, option)
+    }
+    
+    reader := bufio.NewReader(os.Stdin)
+    for {
+        fmt.Fprint(stdout, "Enter choice (1-", len(options), "): ")
+        input, _ := reader.ReadString('\n')
+        input = strings.TrimSpace(input)
+        
+        var choice int
+        if _, err := fmt.Sscanf(input, "%d", &choice); err == nil {
+            if choice >= 1 && choice <= len(options) {
+                return choice - 1
+            }
+        }
+        fmt.Fprintln(stderr, "Invalid choice. Please try again.")
+    }
+}
+
+// PromptMasked prompts for input with masked characters (for passwords)
+func PromptMasked(prompt string) string {
+    fmt.Fprint(stdout, prompt)
+    
+    // Try to read password without echoing
+    if term.IsTerminal(int(os.Stdin.Fd())) {
+        password, err := term.ReadPassword(int(os.Stdin.Fd()))
+        fmt.Fprintln(stdout) // New line after password
+        if err == nil {
+            return string(password)
+        }
+    }
+    
+    // Fallback to regular input if terminal operations fail
+    reader := bufio.NewReader(os.Stdin)
+    input, _ := reader.ReadString('\n')
+    return strings.TrimSpace(input)
+}
+
+// Progress shows a progress indicator with current/total
+func Progress(current, total int, message string) {
+    percentage := (current * 100) / total
+    fmt.Fprintf(stdout, "\r[%d/%d] %d%% %s", current, total, percentage, message)
+    if current == total {
+        fmt.Fprintln(stdout) // New line when complete
+    }
+}
+
+// Confirm prompts for a yes/no confirmation
+func Confirm(prompt string) bool {
+    reader := bufio.NewReader(os.Stdin)
+    for {
+        fmt.Fprintf(stdout, "%s (y/n): ", prompt)
+        input, _ := reader.ReadString('\n')
+        input = strings.ToLower(strings.TrimSpace(input))
+        
+        switch input {
+        case "y", "yes":
+            return true
+        case "n", "no":
+            return false
+        default:
+            fmt.Fprintln(stderr, "Please answer 'y' or 'n'")
+        }
+    }
 }

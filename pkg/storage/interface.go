@@ -85,6 +85,8 @@ func GetBackendWithOptions(opts BackendOptions) (Backend, error) {
         baseBackend, err = NewSQLiteBackend(opts.BasePath, opts.Environment)
     case "file":
         baseBackend, err = NewFileBackend(opts.BasePath, opts.Environment)
+    case "git":
+        baseBackend, err = NewGitBackend(opts.BasePath, opts.Environment)
     default:
         return nil, fmt.Errorf("unsupported backend type: %s", opts.Type)
     }

@@ -68,7 +68,7 @@ func runHistory(key, environment string, limit int) error {
 			return fmt.Errorf("failed to initialize keystore: %w", err)
 		}
 		
-		pm := auth.NewPasswordManager(ks)
+		pm := auth.NewPasswordManager(ks, cfg)
 
 		// Get or create encryption key
 		key, err := pm.GetOrCreateMasterKey(cfg.Project.ID)
@@ -191,7 +191,7 @@ func runAudit(environment string, limit int, filterUser, filterAction string) er
 			return fmt.Errorf("failed to initialize keystore: %w", err)
 		}
 		
-		pm := auth.NewPasswordManager(ks)
+		pm := auth.NewPasswordManager(ks, cfg)
 
 		// Get or create encryption key
 		key, err := pm.GetOrCreateMasterKey(cfg.Project.ID)
