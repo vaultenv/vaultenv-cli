@@ -354,7 +354,7 @@ func createEnvSetCommand(cfg *config.Config) *cobra.Command {
 
 func createEnvCreateCommand(cfg *config.Config) *cobra.Command {
 	var copyFrom string
-	
+
 	cmd := &cobra.Command{
 		Use:   "create [name]",
 		Short: "Create a new environment",
@@ -381,7 +381,7 @@ func createEnvCreateCommand(cfg *config.Config) *cobra.Command {
 			return nil
 		},
 	}
-	
+
 	cmd.Flags().StringVar(&copyFrom, "copy-from", "", "copy variables from existing environment")
 	return cmd
 }

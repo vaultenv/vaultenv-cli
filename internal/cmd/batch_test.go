@@ -150,27 +150,27 @@ endif`,
 		},
 		// TODO: Fix foreach loop implementation in test batch processor
 		/*{
-			name: "batch_loops",
-			batchFile: `# Loop example
-@ENVS=dev,staging,prod
-foreach ENV in $ENVS
-  set ${ENV}_URL http://${ENV}.example.com
-endfor`,
-			verifyStore: func(t *testing.T, store storage.Backend) {
-				expected := map[string]string{
-					"dev_URL":     "http://dev.example.com",
-					"staging_URL": "http://staging.example.com",
-					"prod_URL":    "http://prod.example.com",
-				}
+					name: "batch_loops",
+					batchFile: `# Loop example
+		@ENVS=dev,staging,prod
+		foreach ENV in $ENVS
+		  set ${ENV}_URL http://${ENV}.example.com
+		endfor`,
+					verifyStore: func(t *testing.T, store storage.Backend) {
+						expected := map[string]string{
+							"dev_URL":     "http://dev.example.com",
+							"staging_URL": "http://staging.example.com",
+							"prod_URL":    "http://prod.example.com",
+						}
 
-				for key, expectedVal := range expected {
-					val, _ := store.Get(key)
-					if val != expectedVal {
-						t.Errorf("%s = %q, want %q", key, val, expectedVal)
-					}
-				}
-			},
-		},*/
+						for key, expectedVal := range expected {
+							val, _ := store.Get(key)
+							if val != expectedVal {
+								t.Errorf("%s = %q, want %q", key, val, expectedVal)
+							}
+						}
+					},
+				},*/
 		{
 			name: "batch_from_stdin",
 			args: []string{"-"},
@@ -351,7 +351,7 @@ func processBatch(cmd *cobra.Command, store storage.Backend, content string, dry
 	executed := 0
 	errors := 0
 	variables := make(map[string]string)
-	
+
 	i := 0
 	for i < len(lines) {
 		line := strings.TrimSpace(lines[i])
@@ -386,7 +386,7 @@ func processBatch(cmd *cobra.Command, store storage.Backend, content string, dry
 
 		command := parts[0]
 		args := parts[1:]
-		
+
 		// Debug foreach
 		if command == "foreach" {
 			cmd.Printf("DEBUG: foreach command with args: %v, variables: %v\n", args, variables)
@@ -452,13 +452,13 @@ func processBatch(cmd *cobra.Command, store storage.Backend, content string, dry
 					varName := parts[0]
 					expectedVal := parts[1]
 					actualVal, _ := store.Get(varName)
-					
+
 					// Find matching else/endif
 					ifLevel := 1
 					startLine := i + 1
 					endIfLine := -1
 					elseLine := -1
-					
+
 					for j := startLine; j < len(lines) && ifLevel > 0; j++ {
 						trimmed := strings.TrimSpace(lines[j])
 						if strings.HasPrefix(trimmed, "if ") {
@@ -472,7 +472,7 @@ func processBatch(cmd *cobra.Command, store storage.Backend, content string, dry
 							}
 						}
 					}
-					
+
 					if actualVal == expectedVal {
 						// Execute if block
 						if elseLine > 0 {
@@ -518,7 +518,7 @@ func processBatch(cmd *cobra.Command, store storage.Backend, content string, dry
 				listVar := strings.TrimPrefix(args[2], "$")
 				if listVal, ok := variables[listVar]; ok {
 					items := strings.Split(listVal, ",")
-					
+
 					// Find endfor
 					endforLine := -1
 					for j := i + 1; j < len(lines); j++ {
@@ -527,7 +527,7 @@ func processBatch(cmd *cobra.Command, store storage.Backend, content string, dry
 							break
 						}
 					}
-					
+
 					if endforLine > 0 {
 						// Execute loop body for each item
 						for _, item := range items {
@@ -535,7 +535,7 @@ func processBatch(cmd *cobra.Command, store storage.Backend, content string, dry
 								loopLine := strings.TrimSpace(lines[j])
 								// Replace loop variable
 								loopLine = strings.ReplaceAll(loopLine, "${"+loopVar+"}", item)
-								
+
 								// Process the line
 								if strings.HasPrefix(loopLine, "set ") {
 									setParts := strings.Fields(loopLine)

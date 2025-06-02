@@ -19,17 +19,17 @@ import (
 // Test newShellCommand
 func TestNewShellCommand(t *testing.T) {
 	cmd := newShellCommand()
-	
+
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "shell", cmd.Use)
 	assert.Contains(t, cmd.Short, "Load variables into shell environment")
-	
+
 	// Check flags
 	envFlag := cmd.Flags().Lookup("env")
 	assert.NotNil(t, envFlag)
 	assert.Equal(t, "environment to load", envFlag.Usage)
 	assert.Equal(t, "development", envFlag.DefValue)
-	
+
 	shellFlag := cmd.Flags().Lookup("shell")
 	assert.NotNil(t, shellFlag)
 	assert.Equal(t, "shell type (bash, zsh, fish, powershell)", shellFlag.Usage)
@@ -38,11 +38,11 @@ func TestNewShellCommand(t *testing.T) {
 // Test newRunCommand
 func TestNewRunCommand(t *testing.T) {
 	cmd := newRunCommand()
-	
+
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "run -- COMMAND [ARGS...]", cmd.Use)
 	assert.Contains(t, cmd.Short, "Run command with environment variables")
-	
+
 	// Check flags
 	envFlag := cmd.Flags().Lookup("env")
 	assert.NotNil(t, envFlag)
@@ -113,14 +113,14 @@ func TestDetectShell(t *testing.T) {
 			// Save and restore SHELL env var
 			oldShell := os.Getenv("SHELL")
 			defer os.Setenv("SHELL", oldShell)
-			
+
 			// Set test SHELL env
 			if tt.shellEnv != "" {
 				os.Setenv("SHELL", tt.shellEnv)
 			} else {
 				os.Unsetenv("SHELL")
 			}
-			
+
 			// Override runtime.GOOS if needed
 			if tt.goos != "" && tt.shellEnv == "" {
 				// Note: We can't actually change runtime.GOOS in tests
@@ -135,7 +135,7 @@ func TestDetectShell(t *testing.T) {
 				}
 				return
 			}
-			
+
 			got := detectShell()
 			assert.Equal(t, tt.want, got)
 		})
@@ -145,9 +145,9 @@ func TestDetectShell(t *testing.T) {
 // Test generateShellCommands function
 func TestGenerateShellCommands(t *testing.T) {
 	vars := map[string]string{
-		"TEST_VAR":     "test value",
-		"QUOTED_VAR":   "test'value",
-		"EMPTY_VAR":    "",
+		"TEST_VAR":      "test value",
+		"QUOTED_VAR":    "test'value",
+		"EMPTY_VAR":     "",
 		"SPECIAL_CHARS": "test$value@123",
 	}
 
@@ -318,7 +318,7 @@ func TestGetEnvironmentVariables(t *testing.T) {
 			}
 
 			vars, err := getEnvironmentVariables(cfg, tt.environment)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errContains != "" {
@@ -406,10 +406,10 @@ func TestRunShell(t *testing.T) {
 			shellType:   "", // auto-detect
 			checkOutput: func(t *testing.T, output string) {
 				// Should contain at least one export/set command
-				assert.True(t, 
-					strings.Contains(output, "export") || 
-					strings.Contains(output, "set -x") || 
-					strings.Contains(output, "$env:"))
+				assert.True(t,
+					strings.Contains(output, "export") ||
+						strings.Contains(output, "set -x") ||
+						strings.Contains(output, "$env:"))
 			},
 		},
 		{
@@ -585,7 +585,7 @@ func TestShellCommandIntegration(t *testing.T) {
 
 	// Test shell command
 	shellCmd := newShellCommand()
-	
+
 	tests := []struct {
 		name     string
 		args     []string
@@ -631,7 +631,7 @@ func TestShellCommandIntegration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := test.ExecuteCommand(shellCmd, tt.args...)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -662,7 +662,7 @@ func TestRunCommandIntegration(t *testing.T) {
 
 	// Test run command
 	runCmd := newRunCommand()
-	
+
 	tests := []struct {
 		name    string
 		args    []string
@@ -689,7 +689,7 @@ func TestRunCommandIntegration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			output, err := test.ExecuteCommand(runCmd, tt.args...)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -705,25 +705,25 @@ func TestRunCommandIntegration(t *testing.T) {
 // Test for handling special characters in shell commands
 func TestShellSpecialCharacters(t *testing.T) {
 	specialVars := map[string]string{
-		"SINGLE_QUOTE":    "test'value",
-		"DOUBLE_QUOTE":    `test"value`,
-		"BACKSLASH":       `test\value`,
-		"DOLLAR":          "test$value",
-		"BACKTICK":        "test`value",
-		"NEWLINE":         "test\nvalue",
-		"TAB":             "test\tvalue",
-		"MIXED_QUOTES":    `test'"value`,
-		"EMPTY":           "",
-		"SPACES":          "test value with spaces",
-		"UNICODE":         "test 🚀 value",
-		"PERCENT":         "test%value",
-		"AMPERSAND":       "test&value",
-		"SEMICOLON":       "test;value",
-		"PIPE":            "test|value",
-		"REDIRECT":        "test>value<input",
-		"PARENTHESES":     "test(value)test",
-		"BRACKETS":        "test[value]test",
-		"BRACES":          "test{value}test",
+		"SINGLE_QUOTE": "test'value",
+		"DOUBLE_QUOTE": `test"value`,
+		"BACKSLASH":    `test\value`,
+		"DOLLAR":       "test$value",
+		"BACKTICK":     "test`value",
+		"NEWLINE":      "test\nvalue",
+		"TAB":          "test\tvalue",
+		"MIXED_QUOTES": `test'"value`,
+		"EMPTY":        "",
+		"SPACES":       "test value with spaces",
+		"UNICODE":      "test 🚀 value",
+		"PERCENT":      "test%value",
+		"AMPERSAND":    "test&value",
+		"SEMICOLON":    "test;value",
+		"PIPE":         "test|value",
+		"REDIRECT":     "test>value<input",
+		"PARENTHESES":  "test(value)test",
+		"BRACKETS":     "test[value]test",
+		"BRACES":       "test{value}test",
 	}
 
 	shells := []string{"bash", "zsh", "fish", "powershell"}
@@ -731,10 +731,10 @@ func TestShellSpecialCharacters(t *testing.T) {
 	for _, shell := range shells {
 		t.Run(shell, func(t *testing.T) {
 			commands := generateShellCommands(specialVars, shell)
-			
+
 			// Ensure all variables are present
 			assert.Len(t, commands, len(specialVars))
-			
+
 			// Check that special characters are properly escaped
 			for _, cmd := range commands {
 				switch shell {
@@ -839,7 +839,7 @@ func TestConcurrentShellGeneration(t *testing.T) {
 	}
 
 	shells := []string{"bash", "fish", "powershell"}
-	
+
 	// Run concurrent generations
 	done := make(chan bool)
 	for i := 0; i < 10; i++ {
@@ -993,10 +993,10 @@ func TestShellCommandOutputOrdering(t *testing.T) {
 	// Generate commands multiple times to check consistency
 	for i := 0; i < 5; i++ {
 		commands := generateShellCommands(vars, "bash")
-		
+
 		// Should have all variables
 		assert.Len(t, commands, len(vars))
-		
+
 		// Check all variables are present
 		varSet := make(map[string]bool)
 		for _, cmd := range commands {

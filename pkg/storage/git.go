@@ -186,7 +186,7 @@ func (g *GitBackend) parseContent(content string) (string, error) {
 	// Find the first non-comment, non-empty line after the header
 	inHeader := true
 	valueStartIdx := -1
-	
+
 	for i, line := range lines {
 		trimmedLine := strings.TrimSpace(line)
 
@@ -214,7 +214,7 @@ func (g *GitBackend) parseContent(content string) (string, error) {
 	for len(valueLines) > 0 && strings.TrimSpace(valueLines[len(valueLines)-1]) == "" {
 		valueLines = valueLines[:len(valueLines)-1]
 	}
-	
+
 	return strings.Join(valueLines, "\n"), nil
 }
 

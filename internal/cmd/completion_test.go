@@ -11,22 +11,22 @@ import (
 
 func TestNewCompletionCommand(t *testing.T) {
 	cmd := newCompletionCommand()
-	
+
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "completion [bash|zsh|fish|powershell]", cmd.Use)
 	assert.Equal(t, "Generate shell completion script", cmd.Short)
 	assert.Contains(t, cmd.Long, "Generate shell completion script")
-	
+
 	// Check valid args
 	assert.Equal(t, []string{"bash", "zsh", "fish", "powershell"}, cmd.ValidArgs)
-	
+
 	// Check that it requires exactly one argument
 	err := cmd.Args(cmd, []string{"bash"})
 	assert.NoError(t, err)
-	
+
 	err = cmd.Args(cmd, []string{})
 	assert.Error(t, err)
-	
+
 	err = cmd.Args(cmd, []string{"invalid"})
 	assert.Error(t, err)
 }
@@ -37,7 +37,7 @@ func TestRunCompletion(t *testing.T) {
 	rootCmd := &cobra.Command{Use: "vaultenv"}
 	completionCmd := newCompletionCommand()
 	rootCmd.AddCommand(completionCmd)
-	
+
 	tests := []struct {
 		name    string
 		args    []string
@@ -85,18 +85,18 @@ func TestRunCompletion(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Capture output
 			var buf bytes.Buffer
 			rootCmd.SetOut(&buf)
 			rootCmd.SetErr(&buf)
-			
+
 			// Set args and execute
 			rootCmd.SetArgs(append([]string{"completion"}, tt.args...))
 			err := rootCmd.Execute()
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -111,7 +111,7 @@ func TestRunCompletion(t *testing.T) {
 
 func TestEnvironmentCompletion(t *testing.T) {
 	cmd := &cobra.Command{}
-	
+
 	tests := []struct {
 		name       string
 		toComplete string
@@ -143,7 +143,7 @@ func TestEnvironmentCompletion(t *testing.T) {
 			expected:   nil,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			matches, directive := environmentCompletion(cmd, []string{}, tt.toComplete)
@@ -155,7 +155,7 @@ func TestEnvironmentCompletion(t *testing.T) {
 
 func TestVariableNameCompletion(t *testing.T) {
 	cmd := &cobra.Command{}
-	
+
 	tests := []struct {
 		name       string
 		toComplete string
@@ -192,23 +192,23 @@ func TestVariableNameCompletion(t *testing.T) {
 			hasMatch:   false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			matches, directive := variableNameCompletion(cmd, []string{}, tt.toComplete)
-			
+
 			if tt.hasMatch {
 				assert.NotEmpty(t, matches, "Expected matches for prefix %s", tt.toComplete)
 				// Check that all matches start with the prefix (case insensitive)
 				for _, match := range matches {
-					assert.True(t, 
+					assert.True(t,
 						strings.HasPrefix(strings.ToUpper(match), strings.ToUpper(tt.toComplete)),
 						"Match %s should start with %s", match, tt.toComplete)
 				}
 			} else {
 				assert.Empty(t, matches)
 			}
-			
+
 			assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, directive)
 		})
 	}
@@ -218,12 +218,12 @@ func TestExistingVariableCompletion(t *testing.T) {
 	// This function requires a storage backend, so we test error cases
 	cmd := &cobra.Command{}
 	cmd.Flags().String("env", "", "Environment")
-	
+
 	// Without proper storage setup, this should return no file completion
 	matches, directive := existingVariableCompletion(cmd, []string{}, "")
 	assert.Nil(t, matches)
 	assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, directive)
-	
+
 	// Test with environment flag
 	cmd.Flags().Set("env", "production")
 	matches, directive = existingVariableCompletion(cmd, []string{}, "API")
@@ -233,7 +233,7 @@ func TestExistingVariableCompletion(t *testing.T) {
 
 func TestPatternCompletion(t *testing.T) {
 	cmd := &cobra.Command{}
-	
+
 	tests := []struct {
 		name       string
 		toComplete string
@@ -282,7 +282,7 @@ func TestPatternCompletion(t *testing.T) {
 			expected:   nil,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			matches, directive := patternCompletion(cmd, []string{}, tt.toComplete)

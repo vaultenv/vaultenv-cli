@@ -1014,7 +1014,7 @@ func TestPasswordValidation_EdgeCases(t *testing.T) {
 		{"special_end", "password!", containsSpecial, true},
 		{"special_middle", "pass!word", containsSpecial, true},
 		{"special_all", "!@#$%^&*()", containsSpecial, true},
-		// Numbers at boundaries  
+		// Numbers at boundaries
 		{"number_start", "1password", containsNumber, true},
 		{"number_end", "password1", containsNumber, true},
 		{"number_all", "1234567890", containsNumber, true},
@@ -1184,13 +1184,13 @@ func TestPasswordManager_RaceConditions(t *testing.T) {
 			projectID := fmt.Sprintf("project-%d", index)
 			testKey := make([]byte, 32)
 			rand.Read(testKey)
-			
+
 			// Cache operations
 			pm.cacheSessionKey(projectID, testKey)
 			pm.ClearProjectCache(projectID)
 			pm.cacheEnvironmentKey(projectID, "env", testKey)
 			pm.ClearEnvironmentCache("env")
-			
+
 			done <- true
 		}(i)
 	}

@@ -341,7 +341,7 @@ func TestEncryptedBackend_WithDifferentEncryptors(t *testing.T) {
 	if ev1.Ciphertext != ev2.Ciphertext {
 		t.Error("Deterministic encryptor produced different ciphertexts")
 	}
-	
+
 	// Salt should also be the same for deterministic encryption
 	if ev1.Salt != ev2.Salt {
 		t.Error("Deterministic encryptor produced different salts")

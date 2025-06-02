@@ -18,13 +18,13 @@ import (
 
 func TestNewConfigCommand(t *testing.T) {
 	cmd := newConfigCommand()
-	
+
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "config", cmd.Use)
 	assert.Contains(t, cmd.Short, "Manage VaultEnv configuration")
 	assert.Contains(t, cmd.Long, "config command allows you to view")
 	assert.Contains(t, cmd.Example, "vaultenv config")
-	
+
 	// Check subcommands
 	subcommands := []string{"get", "set", "reset", "edit", "migrate"}
 	for _, subcmd := range subcommands {
@@ -37,14 +37,14 @@ func TestNewConfigCommand(t *testing.T) {
 		}
 		assert.True(t, found, "Subcommand %s not found", subcmd)
 	}
-	
+
 	// Check that default action is set
 	assert.NotNil(t, cmd.RunE)
 }
 
 func TestNewConfigGetCommand(t *testing.T) {
 	cmd := newConfigGetCommand()
-	
+
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "get <key>", cmd.Use)
 	assert.Contains(t, cmd.Short, "Get a configuration value")
@@ -54,7 +54,7 @@ func TestNewConfigGetCommand(t *testing.T) {
 
 func TestNewConfigSetCommand(t *testing.T) {
 	cmd := newConfigSetCommand()
-	
+
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "set <key> <value>", cmd.Use)
 	assert.Contains(t, cmd.Short, "Set a configuration value")
@@ -64,7 +64,7 @@ func TestNewConfigSetCommand(t *testing.T) {
 
 func TestNewConfigEditCommand(t *testing.T) {
 	cmd := newConfigEditCommand()
-	
+
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "edit", cmd.Use)
 	assert.Contains(t, cmd.Short, "Edit configuration in your editor")
@@ -74,12 +74,12 @@ func TestNewConfigEditCommand(t *testing.T) {
 
 func TestNewConfigMigrateCommand(t *testing.T) {
 	cmd := newConfigMigrateCommand()
-	
+
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "migrate", cmd.Use)
 	assert.Contains(t, cmd.Short, "Migrate configuration")
 	assert.Contains(t, cmd.Long, "Migrate your configuration to the latest version")
-	
+
 	// Check force flag
 	forceFlag := cmd.Flag("force")
 	assert.NotNil(t, forceFlag)
@@ -121,32 +121,32 @@ func TestRunConfigShow(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			setupTestDir(t)
 			defer cleanupTestDir(t)
-			
+
 			// Capture output
 			old := os.Stdout
 			r, w, _ := os.Pipe()
 			os.Stdout = w
 			ui.SetOutput(w, os.Stderr)
-			
+
 			if tt.setup != nil {
 				tt.setup(t)
 			}
-			
+
 			cmd := &cobra.Command{}
 			err := runConfigShow(cmd, []string{})
-			
+
 			// Restore output
 			w.Close()
 			os.Stdout = old
 			ui.ResetOutput()
-			
+
 			output, _ := io.ReadAll(r)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -245,30 +245,30 @@ func TestRunConfigGet(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			setupTestDir(t)
 			defer cleanupTestDir(t)
-			
+
 			// Capture output
 			old := os.Stdout
 			r, w, _ := os.Pipe()
 			os.Stdout = w
-			
+
 			if tt.setup != nil {
 				tt.setup(t)
 			}
-			
+
 			cmd := &cobra.Command{}
 			err := runConfigGet(cmd, tt.args)
-			
+
 			// Restore output
 			w.Close()
 			os.Stdout = old
-			
+
 			output, _ := io.ReadAll(r)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -375,24 +375,24 @@ func TestRunConfigSet(t *testing.T) {
 			errMsg:  "cannot unmarshal",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			setupTestDir(t)
 			defer cleanupTestDir(t)
-			
+
 			// Capture output
 			var buf bytes.Buffer
 			ui.SetOutput(&buf, &buf)
 			defer ui.ResetOutput()
-			
+
 			if tt.setup != nil {
 				tt.setup(t)
 			}
-			
+
 			cmd := &cobra.Command{}
 			err := runConfigSet(cmd, tt.args)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -411,11 +411,11 @@ func TestRunConfigSet(t *testing.T) {
 
 func TestNewConfigResetCommand(t *testing.T) {
 	cmd := newConfigResetCommand()
-	
+
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "reset", cmd.Use)
 	assert.Contains(t, cmd.Short, "Reset configuration to defaults")
-	
+
 	// Check force flag
 	forceFlag := cmd.Flag("force")
 	assert.NotNil(t, forceFlag)
@@ -464,33 +464,33 @@ func TestConfigResetCommand(t *testing.T) {
 			errMsg:  "reset cancelled",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			setupTestDir(t)
 			defer cleanupTestDir(t)
-			
+
 			// Mock stdin for confirmation
 			if !tt.force {
 				mockStdin(t, tt.confirm)
 			}
-			
+
 			// Capture output
 			var buf bytes.Buffer
 			ui.SetOutput(&buf, &buf)
 			defer ui.ResetOutput()
-			
+
 			if tt.setup != nil {
 				tt.setup(t)
 			}
-			
+
 			cmd := newConfigResetCommand()
 			if tt.force {
 				cmd.SetArgs([]string{"--force"})
 			}
-			
+
 			err := cmd.Execute()
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -548,21 +548,21 @@ func TestRunConfigEdit(t *testing.T) {
 			errMsg:     "no editor found",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			setupTestDir(t)
 			defer cleanupTestDir(t)
-			
+
 			// Capture output
 			var buf bytes.Buffer
 			ui.SetOutput(&buf, &buf)
 			defer ui.ResetOutput()
-			
+
 			if tt.setup != nil {
 				tt.setup(t)
 			}
-			
+
 			// Mock editor
 			if tt.editorCmd != "" {
 				os.Setenv("EDITOR", tt.editorCmd)
@@ -570,7 +570,7 @@ func TestRunConfigEdit(t *testing.T) {
 			} else {
 				os.Unsetenv("EDITOR")
 			}
-			
+
 			// Mock exec.LookPath if needed
 			if tt.editorPath == "" {
 				// Ensure no common editors are found
@@ -578,10 +578,10 @@ func TestRunConfigEdit(t *testing.T) {
 				os.Setenv("PATH", "/nonexistent")
 				defer os.Setenv("PATH", origPath)
 			}
-			
+
 			cmd := &cobra.Command{}
 			err := runConfigEdit(cmd, []string{})
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -594,7 +594,6 @@ func TestRunConfigEdit(t *testing.T) {
 		})
 	}
 }
-
 
 func TestConfigMigrateCommand(t *testing.T) {
 	tests := []struct {
@@ -621,7 +620,7 @@ func TestConfigMigrateCommand(t *testing.T) {
 				cfg, err := config.Load()
 				require.NoError(t, err)
 				assert.Equal(t, config.CurrentVersion, cfg.Version)
-				
+
 				// Check backup was created (may not exist in test environment)
 				files, _ := filepath.Glob(".vaultenv/config.yaml.backup-*")
 				// Just check that migration succeeded, backup might fail in test
@@ -661,34 +660,34 @@ func TestConfigMigrateCommand(t *testing.T) {
 			errMsg:  "",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			setupTestDir(t)
 			defer cleanupTestDir(t)
-			
+
 			// Setup must be called first
 			if tt.setup != nil {
 				tt.setup(t)
 			}
-			
+
 			// Mock stdin for confirmation after setup
 			if !tt.force && tt.name == "migrate_cancelled" {
 				mockStdin(t, tt.confirm)
 			}
-			
+
 			// Capture output
 			var buf bytes.Buffer
 			ui.SetOutput(&buf, &buf)
 			defer ui.ResetOutput()
-			
+
 			cmd := newConfigMigrateCommand()
 			if tt.force {
 				cmd.SetArgs([]string{"--force"})
 			}
-			
+
 			err := cmd.Execute()
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" && err != nil {
@@ -768,11 +767,11 @@ func TestGetNestedValue(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := getNestedValue(tt.data, tt.key)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -805,8 +804,8 @@ func TestSetNestedValue(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "set_boolean_true",
-			data: map[string]interface{}{},
+			name:  "set_boolean_true",
+			data:  map[string]interface{}{},
 			key:   "enabled",
 			value: "true",
 			want: map[string]interface{}{
@@ -815,8 +814,8 @@ func TestSetNestedValue(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "set_boolean_false",
-			data: map[string]interface{}{},
+			name:  "set_boolean_false",
+			data:  map[string]interface{}{},
 			key:   "enabled",
 			value: "false",
 			want: map[string]interface{}{
@@ -825,8 +824,8 @@ func TestSetNestedValue(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "set_integer",
-			data: map[string]interface{}{},
+			name:  "set_integer",
+			data:  map[string]interface{}{},
 			key:   "count",
 			value: "42",
 			want: map[string]interface{}{
@@ -851,8 +850,8 @@ func TestSetNestedValue(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "create_nested_structure",
-			data: map[string]interface{}{},
+			name:  "create_nested_structure",
+			data:  map[string]interface{}{},
 			key:   "a.b.c",
 			value: "value",
 			want: map[string]interface{}{
@@ -874,11 +873,11 @@ func TestSetNestedValue(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := setNestedValue(tt.data, tt.key, tt.value)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
@@ -893,16 +892,16 @@ func TestSetNestedValue(t *testing.T) {
 func TestRunConfigShowErrors(t *testing.T) {
 	setupTestDir(t)
 	defer cleanupTestDir(t)
-	
+
 	// Create invalid yaml file
 	err := os.WriteFile(".vaultenv/config.yaml", []byte("invalid: yaml: ["), 0600)
 	require.NoError(t, err)
-	
+
 	// Capture output
 	var buf bytes.Buffer
 	ui.SetOutput(&buf, &buf)
 	defer ui.ResetOutput()
-	
+
 	cmd := &cobra.Command{}
 	err = runConfigShow(cmd, []string{})
 	assert.Error(t, err)
@@ -915,10 +914,10 @@ func TestRunConfigEditMoreCases(t *testing.T) {
 	t.Run("edit_recursion_on_invalid_config", func(t *testing.T) {
 		setupTestDir(t)
 		defer cleanupTestDir(t)
-		
+
 		cfg := config.DefaultConfig()
 		require.NoError(t, cfg.Save())
-		
+
 		// Create a script that first corrupts then fixes the file
 		scriptPath := filepath.Join(t.TempDir(), "toggle_editor.sh")
 		script := `#!/bin/sh
@@ -932,18 +931,18 @@ fi
 `
 		err := os.WriteFile(scriptPath, []byte(script), 0755)
 		require.NoError(t, err)
-		
+
 		os.Setenv("EDITOR", scriptPath)
 		defer os.Unsetenv("EDITOR")
-		
+
 		// Mock stdin to say "yes" to editing again
 		mockStdin(t, true)
-		
+
 		// Capture output
 		var buf bytes.Buffer
 		ui.SetOutput(&buf, &buf)
 		defer ui.ResetOutput()
-		
+
 		cmd := &cobra.Command{}
 		err = runConfigEdit(cmd, []string{})
 		// Should eventually succeed after retry
@@ -993,25 +992,25 @@ func TestCopyFile(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			src, dst := tt.setup(t)
-			
+
 			err := copyFile(src, dst)
-			
+
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				
+
 				// Verify content
 				srcContent, err := os.ReadFile(src)
 				require.NoError(t, err)
 				dstContent, err := os.ReadFile(dst)
 				require.NoError(t, err)
 				assert.Equal(t, srcContent, dstContent)
-				
+
 				// Verify permissions
 				info, err := os.Stat(dst)
 				require.NoError(t, err)
@@ -1025,40 +1024,40 @@ func TestConfigCommandIntegration(t *testing.T) {
 	t.Run("full_config_workflow", func(t *testing.T) {
 		setupTestDir(t)
 		defer cleanupTestDir(t)
-		
+
 		// Initialize config
 		cfg := config.DefaultConfig()
 		require.NoError(t, cfg.Save())
-		
+
 		// Test show
 		cmd := newConfigCommand()
 		cmd.SetArgs([]string{})
 		err := cmd.Execute()
 		assert.NoError(t, err)
-		
+
 		// Test get
 		cmd = newConfigCommand()
 		cmd.SetArgs([]string{"get", "git.auto_commit"})
 		err = cmd.Execute()
 		assert.NoError(t, err)
-		
+
 		// Test set
 		cmd = newConfigCommand()
 		cmd.SetArgs([]string{"set", "git.auto_commit", "true"})
 		err = cmd.Execute()
 		assert.NoError(t, err)
-		
+
 		// Verify set worked
 		loadedCfg, err := config.Load()
 		require.NoError(t, err)
 		assert.True(t, loadedCfg.Git.AutoCommit)
-		
+
 		// Test reset with force
 		cmd = newConfigCommand()
 		cmd.SetArgs([]string{"reset", "--force"})
 		err = cmd.Execute()
 		assert.NoError(t, err)
-		
+
 		// Verify reset worked
 		loadedCfg, err = config.Load()
 		require.NoError(t, err)
@@ -1072,7 +1071,7 @@ func setupTestDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	err := os.Chdir(tmpDir)
 	require.NoError(t, err)
-	
+
 	// Create .vaultenv directory
 	err = os.MkdirAll(".vaultenv", 0700)
 	require.NoError(t, err)
@@ -1089,14 +1088,14 @@ func mockStdin(t *testing.T, confirm bool) {
 	if confirm {
 		input = "y\n"
 	}
-	
+
 	r, w, err := os.Pipe()
 	require.NoError(t, err)
-	
+
 	_, err = w.WriteString(input)
 	require.NoError(t, err)
 	w.Close()
-	
+
 	oldStdin := os.Stdin
 	os.Stdin = r
 	t.Cleanup(func() {
@@ -1110,43 +1109,43 @@ func TestConfigEdgeCases(t *testing.T) {
 	t.Run("set_with_special_characters", func(t *testing.T) {
 		setupTestDir(t)
 		defer cleanupTestDir(t)
-		
+
 		cfg := config.DefaultConfig()
 		require.NoError(t, cfg.Save())
-		
+
 		cmd := &cobra.Command{}
 		err := runConfigSet(cmd, []string{"project.name", "test-project!@#$%"})
 		assert.NoError(t, err)
-		
+
 		loadedCfg, err := config.Load()
 		require.NoError(t, err)
 		assert.Equal(t, "test-project!@#$%", loadedCfg.Project.Name)
 	})
-	
+
 	t.Run("get_with_empty_key", func(t *testing.T) {
 		setupTestDir(t)
 		defer cleanupTestDir(t)
-		
+
 		cfg := config.DefaultConfig()
 		require.NoError(t, cfg.Save())
-		
+
 		cmd := &cobra.Command{}
 		err := runConfigGet(cmd, []string{""})
 		assert.Error(t, err)
 	})
-	
+
 	t.Run("set_deeply_nested_new_structure", func(t *testing.T) {
 		setupTestDir(t)
 		defer cleanupTestDir(t)
-		
+
 		cfg := config.DefaultConfig()
 		require.NoError(t, cfg.Save())
-		
+
 		// Test setting a deeply nested valid config field
 		cmd := &cobra.Command{}
 		err := runConfigSet(cmd, []string{"environments.testing.password_policy.min_length", "10"})
 		assert.NoError(t, err)
-		
+
 		// Verify the value was set
 		loadedCfg, err := config.Load()
 		require.NoError(t, err)
@@ -1159,20 +1158,20 @@ func TestConfigMigrateCommandMore(t *testing.T) {
 	t.Run("migrate_output_messages", func(t *testing.T) {
 		setupTestDir(t)
 		defer cleanupTestDir(t)
-		
+
 		// Create config directly
 		cfg := config.DefaultConfig()
 		require.NoError(t, cfg.Save())
-		
+
 		// Capture output
 		var buf bytes.Buffer
 		ui.SetOutput(&buf, &buf)
 		defer ui.ResetOutput()
-		
+
 		cmd := newConfigMigrateCommand()
 		err := cmd.Execute()
 		assert.NoError(t, err)
-		
+
 		// Check output messages - should say already at latest version
 		output := buf.String()
 		assert.Contains(t, output, "Configuration is already at the latest version")
@@ -1185,17 +1184,17 @@ func TestConfigEditInvalidEditor(t *testing.T) {
 	if exec.Command("which", "false").Run() != nil {
 		t.Skip("'false' command not available")
 	}
-	
+
 	t.Run("editor_returns_error", func(t *testing.T) {
 		setupTestDir(t)
 		defer cleanupTestDir(t)
-		
+
 		cfg := config.DefaultConfig()
 		require.NoError(t, cfg.Save())
-		
+
 		os.Setenv("EDITOR", "false")
 		defer os.Unsetenv("EDITOR")
-		
+
 		cmd := &cobra.Command{}
 		err := runConfigEdit(cmd, []string{})
 		assert.Error(t, err)
@@ -1208,10 +1207,10 @@ func TestConfigFileCorruption(t *testing.T) {
 	t.Run("edit_creates_invalid_yaml", func(t *testing.T) {
 		setupTestDir(t)
 		defer cleanupTestDir(t)
-		
+
 		cfg := config.DefaultConfig()
 		require.NoError(t, cfg.Save())
-		
+
 		// Create a script that corrupts the file
 		scriptPath := filepath.Join(t.TempDir(), "corrupt_editor.sh")
 		script := `#!/bin/sh
@@ -1219,13 +1218,13 @@ echo "invalid: yaml: content: [" > "$1"
 `
 		err := os.WriteFile(scriptPath, []byte(script), 0755)
 		require.NoError(t, err)
-		
+
 		os.Setenv("EDITOR", scriptPath)
 		defer os.Unsetenv("EDITOR")
-		
+
 		// Mock stdin to say "no" to editing again
 		mockStdin(t, false)
-		
+
 		cmd := &cobra.Command{}
 		err = runConfigEdit(cmd, []string{})
 		assert.Error(t, err)

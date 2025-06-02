@@ -234,7 +234,7 @@ func TestPasswordManager_GetOrCreateEnvironmentKey_FullFlow(t *testing.T) {
 	t.Run("per_env_disabled", func(t *testing.T) {
 		// Test with per-environment passwords disabled
 		cfg.Security.PerEnvironmentPasswords = false
-		
+
 		// Set project password
 		os.Setenv("VAULTENV_PASSWORD", "project-password")
 		defer os.Unsetenv("VAULTENV_PASSWORD")
@@ -265,7 +265,7 @@ func TestPasswordManager_GetOrCreateEnvironmentKey_FullFlow(t *testing.T) {
 
 	t.Run("per_env_enabled_cached", func(t *testing.T) {
 		cfg.Security.PerEnvironmentPasswords = true
-		
+
 		// Test with cached environment key
 		testKey := []byte("env-specific-key-32-bytes-long!!")
 		pm.cacheEnvironmentKey("test-project", "staging", testKey)
@@ -342,7 +342,7 @@ func TestPasswordManager_PromptNewEnvironmentPassword_PolicyValidation(t *testin
 	// Test policy retrieval and validation
 	t.Run("production_policy", func(t *testing.T) {
 		policy := cfg.GetPasswordPolicy("production")
-		
+
 		// Test various passwords against production policy
 		testCases := []struct {
 			password string
@@ -372,7 +372,7 @@ func TestPasswordManager_PromptNewEnvironmentPassword_PolicyValidation(t *testin
 
 	t.Run("development_policy", func(t *testing.T) {
 		policy := cfg.GetPasswordPolicy("development")
-		
+
 		// Development has minimal requirements
 		err := pm.validatePasswordPolicy("simple12", policy)
 		if err != nil {
@@ -388,7 +388,7 @@ func TestPasswordManager_PromptNewEnvironmentPassword_PolicyValidation(t *testin
 	t.Run("default_policy", func(t *testing.T) {
 		// Environment without specific policy should use default
 		policy := cfg.GetPasswordPolicy("staging")
-		
+
 		// Should have default 8 character minimum
 		err := pm.validatePasswordPolicy("12345678", policy)
 		if err != nil {
@@ -427,7 +427,7 @@ func TestPasswordManager_ChangeEnvironmentPassword_FullFlow(t *testing.T) {
 
 	t.Run("cache_cleanup", func(t *testing.T) {
 		cfg.Security.PerEnvironmentPasswords = true
-		
+
 		// Pre-cache a key
 		cacheKey := pm.getEnvironmentCacheKey("test-project", "staging")
 		pm.sessionCache[cacheKey] = &sessionEntry{
@@ -475,22 +475,22 @@ func TestPasswordManager_ConcurrentEnvironmentAccess(t *testing.T) {
 		wg.Add(1)
 		go func(environment string) {
 			defer wg.Done()
-			
+
 			for i := 0; i < 50; i++ {
 				key := make([]byte, 32)
 				copy(key, []byte(fmt.Sprintf("%s-key-%d", environment, i)))
-				
+
 				// Cache and clear operations
 				pm.cacheEnvironmentKey("test-project", environment, key)
 				cacheKey := pm.getEnvironmentCacheKey("test-project", environment)
-				
+
 				// Read from cache - use mutex for safe access
 				pm.cacheMutex.RLock()
 				if entry, exists := pm.sessionCache[cacheKey]; exists {
 					_ = entry.key
 				}
 				pm.cacheMutex.RUnlock()
-				
+
 				// Occasionally clear
 				if i%10 == 0 {
 					pm.ClearEnvironmentCache(environment)
@@ -533,7 +533,7 @@ func TestPasswordManager_PromptNewPassword_Validation(t *testing.T) {
 	t.Run("password_length_validation", func(t *testing.T) {
 		// Test passwords that would be rejected by PromptNewPassword
 		shortPasswords := []string{"", "1234567", "short"}
-		
+
 		for _, pwd := range shortPasswords {
 			if len(pwd) >= 8 {
 				t.Errorf("Test setup error: %q should be < 8 chars", pwd)
@@ -542,7 +542,7 @@ func TestPasswordManager_PromptNewPassword_Validation(t *testing.T) {
 
 		// Test passwords that would be accepted
 		validPasswords := []string{"12345678", "longenoughpassword", "VerySecurePassword123!"}
-		
+
 		for _, pwd := range validPasswords {
 			if len(pwd) < 8 {
 				t.Errorf("Test setup error: %q should be >= 8 chars", pwd)
@@ -568,7 +568,7 @@ func TestPasswordManager_ErrorRecovery(t *testing.T) {
 	t.Run("corrupt_verification_hash", func(t *testing.T) {
 		// Create key with corrupt verification hash
 		salt, _ := pm.GenerateSalt()
-		
+
 		ks.StoreKey("corrupt-project", &keystore.KeyEntry{
 			ProjectID:        "corrupt-project",
 			Salt:             salt,
@@ -588,7 +588,7 @@ func TestPasswordManager_ErrorRecovery(t *testing.T) {
 		password := "test-password"
 		emptySalt := make([]byte, 0)
 		key := pm.DeriveKey(password, emptySalt)
-		
+
 		if len(key) != 32 {
 			t.Errorf("DeriveKey with empty salt produced key of length %d, want 32", len(key))
 		}
@@ -637,10 +637,10 @@ func TestPasswordManager_PromptPassword_Terminal(t *testing.T) {
 	}
 
 	t.Log("This test would prompt for password input if run interactively")
-	
+
 	// In a real scenario, this would prompt the user
 	// password, err := pm.PromptPassword("Enter test password: ")
-	
+
 	// For testing, we just verify the method exists and document its behavior
 	_ = pm.PromptPassword
 }

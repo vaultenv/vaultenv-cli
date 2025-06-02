@@ -91,10 +91,10 @@ func TestNewRootCommand(t *testing.T) {
 
 func TestConfigureColorOutput(t *testing.T) {
 	tests := []struct {
-		name     string
-		noColor  bool
-		envVar   string
-		ciEnv    string
+		name    string
+		noColor bool
+		envVar  string
+		ciEnv   string
 	}{
 		{
 			name:    "no color flag",
@@ -181,11 +181,11 @@ func TestLoadProjectConfig(t *testing.T) {
 	// Save original cfgFile value
 	originalCfgFile := cfgFile
 	defer func() { cfgFile = originalCfgFile }()
-	
+
 	// Save original working directory
 	originalWd, _ := os.Getwd()
 	defer os.Chdir(originalWd)
-	
+
 	tests := []struct {
 		name      string
 		cfgFile   string
@@ -207,7 +207,7 @@ func TestLoadProjectConfig(t *testing.T) {
 			setupFunc: func(t *testing.T) string {
 				tmpDir := t.TempDir()
 				cfgPath := filepath.Join(tmpDir, "config.yaml")
-				
+
 				cfg := &config.Config{
 					Version: config.CurrentVersion,
 					Project: config.ProjectConfig{
@@ -324,7 +324,7 @@ func TestGetConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := &cobra.Command{}
 			tt.setupFunc(cmd)
-			
+
 			// Set global config
 			oldGlobal := globalConfig
 			globalConfig = tt.globalConfig
@@ -354,7 +354,7 @@ func TestMustGetConfig(t *testing.T) {
 
 	t.Run("without config panics", func(t *testing.T) {
 		cmd := &cobra.Command{}
-		
+
 		// Save global config
 		oldGlobal := globalConfig
 		globalConfig = nil
@@ -380,7 +380,7 @@ func TestAddCommands(t *testing.T) {
 
 	// Verify commands were added
 	assert.NotEmpty(t, rootCmd.Commands())
-	
+
 	// Check for some key commands
 	commandNames := make(map[string]bool)
 	for _, cmd := range rootCmd.Commands() {
