@@ -24,7 +24,6 @@ before:
     - echo "{{ .Version }}" > VERSION
 
     # Create installation script for Unix-like systems
-    # This script is created here because GoReleaser v2 doesn't support archive hooks
     - |
       cat > install.sh << 'EOF'
       #!/bin/sh
@@ -164,7 +163,7 @@ builds:
 
 # Archive configuration
 archives:
-  - id: vaultenv-cli
+  - id: default
     builds:
       - vaultenv-cli
 
@@ -191,37 +190,11 @@ archives:
       - LICENSE
       - README.md
       - CHANGELOG.md
-
-      # Documentation (if these directories exist)
-      - src: docs
-        dst: docs
-        strip_parent: true
-        exclude:
-          - "**/.DS_Store"
-
-      # Examples (if directory exists)
-      - src: examples
-        dst: examples
-        strip_parent: true
-        exclude:
-          - "**/.DS_Store"
-
-      # Shell completions (if directory exists)
-      - src: completions
-        dst: completions
-        strip_parent: true
-
-      # Version file
-      - src: VERSION
-        dst: VERSION
-
-      # Installation script (only for Unix-like systems)
+      - VERSION
+      
+      # Installation script (will be included for all platforms, but only useful on Unix)
       - src: install.sh
         dst: install.sh
-        info:
-          mode: 0755 # Ensure it remains executable
-        filter:
-          goos: [linux, darwin, freebsd, openbsd] # Only include for Unix-like systems
 
 # Create checksums for all artifacts
 checksum:
@@ -343,8 +316,7 @@ release:
 
 # Linux packages for easier installation
 nfpms:
-  - id: vaultenv-cli
-    package_name: vaultenv-cli-beta # Beta suffix for package name
+  - package_name: vaultenv-cli-beta # Beta suffix for package name
     builds:
       - vaultenv-cli
 
@@ -355,6 +327,7 @@ nfpms:
       Secure environment variable management for modern teams (Beta).
       This is a beta release - please report issues at github.com/vaultenv/vaultenv-cli
     license: MIT
+    
     # Package formats
     formats:
       - deb
