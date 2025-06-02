@@ -333,7 +333,7 @@ nfpms:
         echo ""
         echo "Run 'vaultenv-cli --help' to get started"
 
-# # Docker image configuration
+# Docker image configuration
 # dockers:
 #   - id: vaultenv-cli
 #     ids:
@@ -372,29 +372,28 @@ nfpms:
 #       - "--label=org.opencontainers.image.source={{.GitURL}}"
 #       - "--label=org.opencontainers.image.description=Secure environment variable management (Beta)"
 
-# # Create a source tarball
-# source:
-#   enabled: true
-#   name_template: "{{ .ProjectName }}_{{ .Version }}_source"
-#   format: tar.gz
+# Create a source tarball
+source:
+  enabled: true
+  name_template: "{{ .ProjectName }}_{{ .Version }}_source"
+  format: tar.gz
 
-# # Sign artifacts with cosign (optional but recommended for security)
-# # signs:
-# #   - cmd: cosign
-# #     stdin: '{{ .Env.COSIGN_PASSWORD }}'
-# #     args:
-# #       - "sign-blob"
-# #       - "--key=cosign.key"
-# #       - "--output-signature=${signature}"
-# #       - "${artifact}"
-# #     artifacts: all
+# Sign artifacts with cosign (optional but recommended for security)
+# signs:
+#   - cmd: cosign
+#     stdin: '{{ .Env.COSIGN_PASSWORD }}'
+#     args:
+#       - "sign-blob"
+#       - "--key=cosign.key"
+#       - "--output-signature=${signature}"
+#       - "${artifact}"
+#     artifacts: all
 
-# # Create Software Bill of Materials (SBOM)
-# sboms:
-#   - artifacts: archive
-#     args: ["$artifact", "--output", "cyclonedx-json@1.5=$document"]
-
-# # Announce the release (optional)
+# Create Software Bill of Materials (SBOM)
+sboms:
+  - artifacts: archive
+    args: ["$artifact", "--output", "cyclonedx-json@1.5=$document"]
+# Announce the release (optional)
 # announce:
 #   skip: false
 
