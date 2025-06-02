@@ -1,41 +1,92 @@
+# This workflow handles releases for VaultEnv CLI
+# It triggers on version tags and creates GitHub releases with built artifacts
+
 name: Release
 
+# Trigger on version tags (including beta tags like v0.1.0-beta.1)
 on:
   push:
     tags:
-      - 'v*'
+      - "v*.*.*"
+      - "v*.*.*-beta.*"
+      - "v*.*.*-rc.*"
 
+# Permissions needed for creating releases and uploading artifacts
 permissions:
-  contents: write
-  packages: write
-  issues: write
+  contents: write # Create releases
+  packages: write # Upload to GitHub packages
+  attestations: write # Sign artifacts
+  id-token: write # OIDC token for signing
 
 jobs:
-  release:
+  # Main release job using GoReleaser
+  goreleaser:
+    name: Build and Release
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      # Check out code with full history for changelog generation
+      - name: Checkout Repository
+        uses: actions/checkout@v4 # Updated to v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Full history needed for changelog
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.23'
-          cache: true
-
-      - name: Run tests
+      # Configure git for GoReleaser
+      - name: Configure Git
         run: |
-          export VAULTENV_PASSWORD=testpass123
-          go test ./... -timeout 5m || true
-          echo "Tests completed. Some failures are expected in beta."
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
 
+      # Set up Go environment
+      - name: Set up Go
+        uses: actions/setup-go@v5 # Updated to v5
+        with:
+          go-version-file: "go.mod" # Use version from go.mod
+          cache: true # Cache dependencies for faster builds
+
+      # Install additional tools if needed
+      - name: Install Dependencies
+        run: |
+          go install github.com/goreleaser/goreleaser@latest
+
+      # Run tests before release
+      - name: Run Tests
+        run: |
+          go test -v -race -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out
+
+      # Run GoReleaser
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v5
+        uses: goreleaser/goreleaser-action@v6 # Latest version
         with:
           distribution: goreleaser
-          version: latest
+          version: ~> v2 # Explicitly use v2.x series
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Add any other tokens you need (e.g., for Homebrew tap)
+          # HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+      # Upload artifacts for debugging or additional distribution
+      - name: Upload Release Artifacts
+        uses: actions/upload-artifact@v4 # Updated to v4
+        if: always() # Upload even if release partially fails
+        with:
+          name: release-${{ github.ref_name }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.deb
+            dist/*.rpm
+            dist/checksums.txt
+            dist/artifacts.json
+          retention-days: 30
+
+      # Upload test coverage
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.out
+            coverage.html
+          retention-days: 30
