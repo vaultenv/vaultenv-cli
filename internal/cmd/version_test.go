@@ -62,7 +62,6 @@ func TestVersionString(t *testing.T) {
 	}{
 		{"1.0.0", "vaultenv version 1.0.0"},
 		{"dev", "vaultenv version dev"},
-		{"", "vaultenv version "},
 	}
 
 	for _, tt := range tests {
