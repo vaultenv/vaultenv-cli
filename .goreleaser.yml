@@ -1,146 +1,409 @@
-# .goreleaser.yml
+# GoReleaser configuration for VaultEnv CLI Beta Release
+# This configuration is optimized for open source beta releases with
+# comprehensive platform support and clear beta messaging
+
 version: 2
 
+# Project name used in release artifacts
 project_name: vaultenv-cli
 
+# Run these commands before building
 before:
   hooks:
+    # Ensure dependencies are up to date
     - go mod tidy
+    - go mod download
+
+    # Generate any code if needed
     - go generate ./...
 
+    # Run tests to ensure quality
+    - go test -short ./...
+
+    # Create a VERSION file for the build
+    - echo "{{ .Version }}" > VERSION
+
+# Build configuration
 builds:
   - id: vaultenv-cli
     main: ./cmd/vaultenv-cli
     binary: vaultenv-cli
+
+    # Build flags for optimization and metadata
+    flags:
+      - -trimpath # Remove file paths from binary
+
+    # Disable CGO for better portability
     env:
       - CGO_ENABLED=0
+
+    # Target platforms - comprehensive coverage for beta testing
     goos:
       - linux
-      - windows
       - darwin
+      - windows
+      - freebsd
+      - openbsd
+
     goarch:
       - amd64
       - arm64
+      - arm
       - "386"
+
+    # ARM variants for specific devices
+    goarm:
+      - "6" # Raspberry Pi 1
+      - "7" # Raspberry Pi 2+
+
+    # Skip unsupported combinations
     ignore:
       - goos: darwin
         goarch: "386"
+      - goos: darwin
+        goarch: arm
       - goos: windows
         goarch: arm64
+      - goos: windows
+        goarch: arm
+      - goos: freebsd
+        goarch: arm
+      - goos: openbsd
+        goarch: arm
+
+    # Inject version information at build time
     ldflags:
-      - -s -w
+      - -s -w # Strip debug info for smaller binaries
       - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
+      - -X main.commit={{.FullCommit}}
       - -X main.buildTime={{.Date}}
       - -X main.builtBy=goreleaser
+      - -X main.gitBranch={{.Branch}}
+      - -X main.gitState={{.IsGitDirty}}
+      - -X main.buildHost={{.Env.HOSTNAME}}
+
+    # Use commit timestamp for reproducible builds
     mod_timestamp: "{{ .CommitTimestamp }}"
 
+    # Add build tags for beta features
+    tags:
+      - beta
+      - netgo # Use pure Go networking
+      - osusergo # Use pure Go user functions
+
+# Archive configuration
 archives:
   - id: vaultenv-cli
     builds:
       - vaultenv-cli
+
+    # Archive format per platform
     format: tar.gz
     format_overrides:
       - goos: windows
         format: zip
+
+    # Naming template for archives
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "arm64" }}aarch64
       {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+    # Files to include in the archive
     files:
       - LICENSE
       - README.md
-      - docs/*
-      - src: CHANGELOG.md
-        dst: CHANGELOG.md
-        strip_parent: false
+      - CHANGELOG.md
+      - docs/**/*
+      - examples/**/*
+      - completions/**/*
+      - src: VERSION
+        dst: VERSION
 
+    # Add installation script for Unix systems
+    hooks:
+      post:
+        - cmd: |
+            cat > {{ .Path }}/install.sh << 'EOF'
+            #!/bin/sh
+            set -e
+            echo "Installing vaultenv-cli {{ .Version }} (Beta)..."
+            install -m 755 vaultenv-cli /usr/local/bin/
+            echo "✅ Installation complete!"
+            echo "Run 'vaultenv-cli --version' to verify"
+            EOF
+          filter:
+            goos: [linux, darwin, freebsd, openbsd]
+
+# Create checksums for all artifacts
 checksum:
   name_template: "checksums.txt"
   algorithm: sha256
+  extra_files:
+    - glob: ./dist/*.json # Include metadata files
 
+# Snapshot naming for development builds
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  name_template: "{{ incpatch .Version }}-dev-{{ .ShortCommit }}"
 
+# Changelog generation
 changelog:
+  use: github # Use GitHub PR/issue information
   sort: asc
-  groups:
-    - title: Features
-      regexp: "^.*feat[(\\w)]*:+.*$"
-      order: 0
-    - title: Bug Fixes
-      regexp: "^.*fix[(\\w)]*:+.*$"
-      order: 1
-    - title: Documentation
-      regexp: "^.*docs[(\\w)]*:+.*$"
-      order: 2
-    - title: Other
-      order: 999
-  filters:
-    exclude:
-      - "^test:"
-      - "^chore:"
-      - Merge pull request
-      - Merge branch
+  abbrev: 7 # Short commit hash length
 
+  # Group commits by type
+  groups:
+    - title: "🚀 Features"
+      regexp: '^.*feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: "🐛 Bug Fixes"
+      regexp: '^.*fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "🔐 Security"
+      regexp: '^.*security(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: "⚡ Performance"
+      regexp: '^.*perf(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: "📚 Documentation"
+      regexp: '^.*docs(\([[:word:]]+\))??!?:.+$'
+      order: 4
+    - title: "🧪 Testing"
+      regexp: '^.*test(\([[:word:]]+\))??!?:.+$'
+      order: 5
+    - title: "🔧 Other Changes"
+      order: 999
+
+  filters:
+    # Exclude certain commits from changelog
+    exclude:
+      - '^chore(\([[:word:]]+\))??:.+$'
+      - '^ci(\([[:word:]]+\))??:.+$'
+      - '^refactor(\([[:word:]]+\))??:.+$'
+      - '^style(\([[:word:]]+\))??:.+$'
+      - "^Merge pull request"
+      - "^Merge branch"
+
+# GitHub Release configuration
 release:
   github:
     owner: vaultenv
     name: vaultenv-cli
-  draft: false
+
+  # Mark as prerelease for beta versions
   prerelease: auto
-  name_template: "{{.ProjectName}} v{{.Version}}"
+
+  # Don't create draft releases
+  draft: false
+
+  # Release name template
+  name_template: "VaultEnv CLI {{ .Version }} (Beta)"
+
+  # Custom header for beta releases
   header: |
-    ## VaultEnv CLI v{{.Version}}
+    ## 🚀 VaultEnv CLI {{ .Version }} - Beta Release
 
-    Welcome to the {{ if .IsSnapshot }}snapshot{{ else }}{{ if .Prerelease }}pre-release{{ else }}release{{ end }}{{ end }} of VaultEnv CLI!
+    > ⚠️ **Beta Software Notice**: This is a beta release intended for early adopters and testing. 
+    > While we've tested it thoroughly, you may encounter bugs. Please report any issues!
 
-    ### Installation
+    ### ✨ What's New
+
+    {{ .Changelog }}
+
+    ### 📦 Installation
 
     #### Quick Install (Linux/macOS)
     ```bash
-    curl -sSL https://raw.githubusercontent.com/vaultenv/vaultenv-cli/main/install.sh | bash
+    curl -sSL https://install.vaultenv.io/beta | bash
+    ```
+
+    #### Homebrew (macOS/Linux)
+    ```bash
+    brew tap vaultenv/beta
+    brew install vaultenv-cli-beta
     ```
 
     #### Manual Download
-    Download the appropriate archive for your platform below.
+    Download the appropriate archive for your platform below and extract it.
 
+    ### 🧪 Beta Testing Focus Areas
+
+    We'd especially appreciate feedback on:
+    - Cross-platform compatibility
+    - Performance with large numbers of variables
+    - Error messages and developer experience
+    - Integration with your existing tools
+
+  # Footer with helpful links
   footer: |
-    ## What's Next?
+    ---
 
-    - Read the [documentation](https://github.com/vaultenv/vaultenv-cli#readme)
-    - Report issues at [GitHub Issues](https://github.com/vaultenv/vaultenv-cli/issues)
-    - Join our [community discussions](https://github.com/vaultenv/vaultenv-cli/discussions)
+    ### 📚 Resources
+
+    - 📖 [Getting Started Guide](https://docs.vaultenv.io/getting-started)
+    - 🐛 [Report Issues](https://github.com/vaultenv/vaultenv-cli/issues/new?labels=bug,beta&template=beta_bug_report.md)
+    - 💬 [Beta Feedback Discussion](https://github.com/vaultenv/vaultenv-cli/discussions/categories/beta-feedback)
+    - 🔐 [Security Policy](https://github.com/vaultenv/vaultenv-cli/security/policy)
+
+    ### 🙏 Thank You, Beta Testers!
+
+    Your feedback is invaluable in making VaultEnv CLI better. Join our [Discord](https://discord.gg/vaultenv) 
+    to connect with other beta testers and the development team.
 
     **Full Changelog**: https://github.com/vaultenv/vaultenv-cli/compare/{{ .PreviousTag }}...{{ .Tag }}
 
-# Optional: Linux packages
+  # Extra files to upload with release
+  extra_files:
+    - glob: ./dist/checksums.txt
+    - glob: ./VERSION
+    - glob: ./install.sh
+
+# Linux packages for easier installation
 nfpms:
   - id: vaultenv-cli
-    package_name: vaultenv-cli
+    package_name: vaultenv-cli-beta # Beta suffix for package name
     builds:
       - vaultenv-cli
+
     vendor: VaultEnv
-    homepage: https://github.com/vaultenv/vaultenv-cli
-    maintainer: VaultEnv Team <gnana097@gmail.com>
-    description: Secure environment variable management for modern teams
+    homepage: https://vaultenv.io
+    maintainer: VaultEnv Team <support@vaultenv.io>
+    description: |
+      Secure environment variable management for modern teams (Beta).
+      This is a beta release - please report issues at github.com/vaultenv/vaultenv-cli
     license: MIT
+    # Package formats
     formats:
       - deb
       - rpm
       - apk
+      - archlinux
+
+    # Version metadata
+    version_metadata: beta
+    release: "{{ .Version }}"
+
+    # Dependencies
+    dependencies:
+      - ca-certificates
+
+    # Recommended packages
+    recommends:
+      - git
+
+    # Package contents
     contents:
+      # Binary
+      - src: ./vaultenv-cli
+        dst: /usr/bin/vaultenv-cli
+
+      # Documentation
       - src: ./LICENSE
-        dst: /usr/share/doc/vaultenv-cli/LICENSE
+        dst: /usr/share/doc/vaultenv-cli-beta/LICENSE
       - src: ./README.md
-        dst: /usr/share/doc/vaultenv-cli/README.md
-    overrides:
-      deb:
-        dependencies:
-          - ca-certificates
-      rpm:
-        dependencies:
-          - ca-certificates
+        dst: /usr/share/doc/vaultenv-cli-beta/README.md
+      - src: ./CHANGELOG.md
+        dst: /usr/share/doc/vaultenv-cli-beta/CHANGELOG.md
+
+      # Shell completions
+      - src: ./completions/vaultenv-cli.bash
+        dst: /usr/share/bash-completion/completions/vaultenv-cli
+      - src: ./completions/vaultenv-cli.zsh
+        dst: /usr/share/zsh/site-functions/_vaultenv-cli
+      - src: ./completions/vaultenv-cli.fish
+        dst: /usr/share/fish/vendor_completions.d/vaultenv-cli.fish
+
+      # Man page (if you have one)
+      # - src: ./man/vaultenv-cli.1
+      #   dst: /usr/share/man/man1/vaultenv-cli.1
+
+    # Post-install script
+    scripts:
+      postinstall: |
+        #!/bin/sh
+        echo "✅ VaultEnv CLI Beta installed successfully!"
+        echo "⚠️  This is beta software - please report issues at:"
+        echo "   https://github.com/vaultenv/vaultenv-cli/issues"
+        echo ""
+        echo "Run 'vaultenv-cli --help' to get started"
+
+# # Docker image configuration
+# dockers:
+#   - id: vaultenv-cli
+#     ids:
+#       - vaultenv-cli
+
+#     # Image templates - push to GitHub Container Registry
+#     image_templates:
+#       - "ghcr.io/vaultenv/vaultenv-cli:{{ .Version }}"
+#       - "ghcr.io/vaultenv/vaultenv-cli:beta"
+#       - "ghcr.io/vaultenv/vaultenv-cli:{{ .Major }}.{{ .Minor }}-beta"
+
+#     # Build for multiple platforms
+#     use: buildx
+#     goos: linux
+#     goarch: amd64
+
+#     # Dockerfile content
+#     dockerfile: |
+#       FROM alpine:3.19
+#       RUN apk add --no-cache ca-certificates git
+#       COPY vaultenv-cli /usr/local/bin/
+
+#       # Add non-root user
+#       RUN adduser -D -u 1000 vaultenv
+#       USER vaultenv
+
+#       ENTRYPOINT ["vaultenv-cli"]
+
+#     # Build flags
+#     build_flag_templates:
+#       - "--pull"
+#       - "--label=org.opencontainers.image.created={{.Date}}"
+#       - "--label=org.opencontainers.image.name={{.ProjectName}}"
+#       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+#       - "--label=org.opencontainers.image.version={{.Version}}"
+#       - "--label=org.opencontainers.image.source={{.GitURL}}"
+#       - "--label=org.opencontainers.image.description=Secure environment variable management (Beta)"
+
+# # Create a source tarball
+# source:
+#   enabled: true
+#   name_template: "{{ .ProjectName }}_{{ .Version }}_source"
+#   format: tar.gz
+
+# # Sign artifacts with cosign (optional but recommended for security)
+# # signs:
+# #   - cmd: cosign
+# #     stdin: '{{ .Env.COSIGN_PASSWORD }}'
+# #     args:
+# #       - "sign-blob"
+# #       - "--key=cosign.key"
+# #       - "--output-signature=${signature}"
+# #       - "${artifact}"
+# #     artifacts: all
+
+# # Create Software Bill of Materials (SBOM)
+# sboms:
+#   - artifacts: archive
+#     args: ["$artifact", "--output", "cyclonedx-json@1.5=$document"]
+
+# # Announce the release (optional)
+# announce:
+#   skip: false
+
+#   # Discord webhook announcement
+#   discord:
+#     enabled: true
+#     message_template: |
+#       🚀 **VaultEnv CLI {{ .Version }} Beta Released!**
+
+#       Check it out: {{ .ReleaseURL }}
+
+#       This is a beta release - your feedback is invaluable!
