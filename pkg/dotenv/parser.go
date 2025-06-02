@@ -38,7 +38,7 @@ func (p *Parser) ParseFile(filename string) (map[string]string, error) {
 		return nil, fmt.Errorf("failed to open file %s: %w", filename, err)
 	}
 	defer file.Close()
-	
+
 	return p.Parse(file)
 }
 
@@ -49,16 +49,16 @@ func (p *Parser) Parse(reader io.Reader) (map[string]string, error) {
 	vars := make(map[string]string)
 	scanner := bufio.NewScanner(reader)
 	lineNum := 0
-	
+
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
-		
+
 		// Handle common edge cases in .env files
 		if p.shouldSkipLine(line) {
 			continue
 		}
-		
+
 		key, value, err := p.parseLine(line)
 		if err != nil {
 			if p.IgnoreInvalid {
@@ -67,15 +67,15 @@ func (p *Parser) Parse(reader io.Reader) (map[string]string, error) {
 			}
 			return nil, fmt.Errorf("line %d: %w", lineNum, err)
 		}
-		
+
 		// Handle variable expansion if enabled
 		if p.ExpandVars {
 			value = p.expandVariables(value, vars)
 		}
-		
+
 		vars[key] = value
 	}
-	
+
 	return vars, scanner.Err()
 }
 
@@ -84,17 +84,17 @@ func (p *Parser) shouldSkipLine(line string) bool {
 	if p.TrimSpace {
 		line = strings.TrimSpace(line)
 	}
-	
+
 	// Skip empty lines
 	if p.IgnoreEmpty && len(line) == 0 {
 		return true
 	}
-	
+
 	// Skip comments
 	if p.IgnoreComments && strings.HasPrefix(line, "#") {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -108,34 +108,34 @@ func (p *Parser) parseLine(line string) (key, value string, err error) {
 	if p.TrimSpace {
 		line = strings.TrimSpace(line)
 	}
-	
+
 	// Remove 'export ' prefix if present (common in shell scripts)
 	line = strings.TrimPrefix(line, "export ")
-	
+
 	// Find the first equals sign
 	equalIndex := strings.Index(line, "=")
 	if equalIndex == -1 {
 		return "", "", fmt.Errorf("no '=' found in line: %s", line)
 	}
-	
+
 	key = line[:equalIndex]
 	value = line[equalIndex+1:]
-	
+
 	if p.TrimSpace {
 		key = strings.TrimSpace(key)
 	}
-	
+
 	// Validate key format
 	if !isValidEnvVarName(key) {
 		return "", "", fmt.Errorf("invalid variable name: %s", key)
 	}
-	
+
 	// Handle quoted values
 	value, err = p.unquoteValue(value)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to parse value for %s: %w", key, err)
 	}
-	
+
 	return key, value, nil
 }
 
@@ -146,25 +146,25 @@ func isValidEnvVarName(name string) bool {
 	if len(name) == 0 {
 		return false
 	}
-	
+
 	// Must start with letter or underscore
-	if !((name[0] >= 'A' && name[0] <= 'Z') || 
-		 (name[0] >= 'a' && name[0] <= 'z') || 
-		 name[0] == '_') {
+	if !((name[0] >= 'A' && name[0] <= 'Z') ||
+		(name[0] >= 'a' && name[0] <= 'z') ||
+		name[0] == '_') {
 		return false
 	}
-	
+
 	// Rest must be alphanumeric or underscore
 	for i := 1; i < len(name); i++ {
 		c := name[i]
-		if !((c >= 'A' && c <= 'Z') || 
-			 (c >= 'a' && c <= 'z') || 
-			 (c >= '0' && c <= '9') || 
-			 c == '_') {
+		if !((c >= 'A' && c <= 'Z') ||
+			(c >= 'a' && c <= 'z') ||
+			(c >= '0' && c <= '9') ||
+			c == '_') {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -173,12 +173,12 @@ func (p *Parser) unquoteValue(value string) (string, error) {
 	if p.TrimSpace {
 		value = strings.TrimSpace(value)
 	}
-	
+
 	// Handle empty value
 	if len(value) == 0 {
 		return "", nil
 	}
-	
+
 	// Handle double quoted values
 	if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
 		// Remove surrounding quotes
@@ -186,12 +186,12 @@ func (p *Parser) unquoteValue(value string) (string, error) {
 		// Process escape sequences
 		return p.processEscapeSequences(value)
 	}
-	
+
 	// Handle single quoted values (no escape sequences)
 	if len(value) >= 2 && value[0] == '\'' && value[len(value)-1] == '\'' {
 		return value[1 : len(value)-1], nil
 	}
-	
+
 	// Unquoted value - trim trailing whitespace but preserve leading
 	return strings.TrimRightFunc(value, func(r rune) bool {
 		return r == ' ' || r == '\t'
@@ -202,7 +202,7 @@ func (p *Parser) unquoteValue(value string) (string, error) {
 func (p *Parser) processEscapeSequences(value string) (string, error) {
 	var result strings.Builder
 	i := 0
-	
+
 	for i < len(value) {
 		if value[i] == '\\' && i+1 < len(value) {
 			switch value[i+1] {
@@ -240,7 +240,7 @@ func (p *Parser) processEscapeSequences(value string) (string, error) {
 			i++
 		}
 	}
-	
+
 	return result.String(), nil
 }
 
@@ -248,7 +248,7 @@ func (p *Parser) processEscapeSequences(value string) (string, error) {
 func (p *Parser) expandVariables(value string, vars map[string]string) string {
 	// Pattern for ${VAR} and $VAR
 	re := regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)`)
-	
+
 	return re.ReplaceAllStringFunc(value, func(match string) string {
 		// Extract variable name
 		var varName string
@@ -257,17 +257,17 @@ func (p *Parser) expandVariables(value string, vars map[string]string) string {
 		} else {
 			varName = match[1:]
 		}
-		
+
 		// Look up in parsed variables first
 		if val, ok := vars[varName]; ok {
 			return val
 		}
-		
+
 		// Fall back to environment variables
 		if val := os.Getenv(varName); val != "" {
 			return val
 		}
-		
+
 		// Return original if not found
 		return match
 	})
@@ -287,16 +287,16 @@ func (p *Parser) ParseWithMetadata(reader io.Reader) ([]Variable, error) {
 	var variables []Variable
 	scanner := bufio.NewScanner(reader)
 	lineNum := 0
-	
+
 	for scanner.Scan() {
 		lineNum++
 		line := scanner.Text()
 		original := line
-		
+
 		if p.shouldSkipLine(line) {
 			continue
 		}
-		
+
 		key, value, err := p.parseLine(line)
 		if err != nil {
 			if p.IgnoreInvalid {
@@ -304,7 +304,7 @@ func (p *Parser) ParseWithMetadata(reader io.Reader) ([]Variable, error) {
 			}
 			return nil, fmt.Errorf("line %d: %w", lineNum, err)
 		}
-		
+
 		// Handle variable expansion if enabled
 		if p.ExpandVars {
 			// For metadata parsing, we need to track which variables exist
@@ -314,7 +314,7 @@ func (p *Parser) ParseWithMetadata(reader io.Reader) ([]Variable, error) {
 			}
 			value = p.expandVariables(value, existingVars)
 		}
-		
+
 		variables = append(variables, Variable{
 			Key:      key,
 			Value:    value,
@@ -322,7 +322,7 @@ func (p *Parser) ParseWithMetadata(reader io.Reader) ([]Variable, error) {
 			Original: original,
 		})
 	}
-	
+
 	return variables, scanner.Err()
 }
 
@@ -341,21 +341,21 @@ func (p *Parser) ParseWithStats(reader io.Reader) (map[string]string, Stats, err
 	vars := make(map[string]string)
 	stats := Stats{}
 	seen := make(map[string]bool)
-	
+
 	scanner := bufio.NewScanner(reader)
 	lineNum := 0
-	
+
 	for scanner.Scan() {
 		lineNum++
 		stats.TotalLines++
 		line := scanner.Text()
-		
+
 		// Check for empty lines
 		if strings.TrimSpace(line) == "" {
 			stats.EmptyLines++
 			continue
 		}
-		
+
 		// Check for comments
 		if strings.HasPrefix(strings.TrimSpace(line), "#") {
 			stats.Comments++
@@ -363,11 +363,11 @@ func (p *Parser) ParseWithStats(reader io.Reader) (map[string]string, Stats, err
 				continue
 			}
 		}
-		
+
 		if p.shouldSkipLine(line) {
 			continue
 		}
-		
+
 		key, value, err := p.parseLine(line)
 		if err != nil {
 			stats.InvalidLines++
@@ -376,21 +376,21 @@ func (p *Parser) ParseWithStats(reader io.Reader) (map[string]string, Stats, err
 			}
 			return nil, stats, fmt.Errorf("line %d: %w", lineNum, err)
 		}
-		
+
 		// Check for duplicates
 		if seen[key] {
 			stats.DuplicateKeys = append(stats.DuplicateKeys, key)
 		}
 		seen[key] = true
-		
+
 		// Handle variable expansion if enabled
 		if p.ExpandVars {
 			value = p.expandVariables(value, vars)
 		}
-		
+
 		vars[key] = value
 		stats.Variables++
 	}
-	
+
 	return vars, stats, scanner.Err()
 }

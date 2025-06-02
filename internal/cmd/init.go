@@ -1,33 +1,33 @@
 package cmd
 
 import (
-    "fmt"
-    "os"
-    "path/filepath"
+	"fmt"
+	"os"
+	"path/filepath"
 
-    "github.com/spf13/cobra"
-    "github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/spf13/cobra"
 
-    "github.com/vaultenv/vaultenv-cli/internal/ui"
+	"github.com/vaultenv/vaultenv-cli/internal/ui"
 )
 
 func newInitCommand() *cobra.Command {
-    var (
-        force bool
-        name  string
-    )
+	var (
+		force bool
+		name  string
+	)
 
-    cmd := &cobra.Command{
-        Use:   "init",
-        Short: "Initialize a new vaultenv project",
-        Long: `Initialize a new vaultenv project in the current directory.
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "Initialize a new vaultenv project",
+		Long: `Initialize a new vaultenv project in the current directory.
 
 This command creates:
   • .vaultenv/config.yaml - Project configuration
   • .vaultenv/.gitignore - Git ignore rules
   • .env.example - Example environment file`,
 
-        Example: `  # Initialize in current directory
+		Example: `  # Initialize in current directory
   vaultenv-cli init
 
   # Initialize with project name
@@ -36,84 +36,84 @@ This command creates:
   # Force overwrite existing configuration
   vaultenv-cli init --force`,
 
-        RunE: func(cmd *cobra.Command, args []string) error {
-            return runInit(name, force)
-        },
-    }
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runInit(name, force)
+		},
+	}
 
-    // Add command-specific flags
-    cmd.Flags().BoolVarP(&force, "force", "f", false,
-        "overwrite existing configuration")
-    cmd.Flags().StringVarP(&name, "name", "n", "",
-        "project name (defaults to directory name)")
+	// Add command-specific flags
+	cmd.Flags().BoolVarP(&force, "force", "f", false,
+		"overwrite existing configuration")
+	cmd.Flags().StringVarP(&name, "name", "n", "",
+		"project name (defaults to directory name)")
 
-    return cmd
+	return cmd
 }
 
 func runInit(projectName string, force bool) error {
-    // Get current directory
-    currentDir, err := os.Getwd()
-    if err != nil {
-        return fmt.Errorf("failed to get current directory: %w", err)
-    }
+	// Get current directory
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
 
-    // Default project name to directory name
-    if projectName == "" {
-        projectName = filepath.Base(currentDir)
-    }
+	// Default project name to directory name
+	if projectName == "" {
+		projectName = filepath.Base(currentDir)
+	}
 
-    // Check if already initialized
-    configDir := filepath.Join(currentDir, ".vaultenv")
-    configFile := filepath.Join(configDir, "config.yaml")
+	// Check if already initialized
+	configDir := filepath.Join(currentDir, ".vaultenv")
+	configFile := filepath.Join(configDir, "config.yaml")
 
-    if _, err := os.Stat(configFile); err == nil && !force {
-        return fmt.Errorf("project already initialized. Use --force to overwrite")
-    }
+	if _, err := os.Stat(configFile); err == nil && !force {
+		return fmt.Errorf("project already initialized. Use --force to overwrite")
+	}
 
-    // Collect project information
-    var answers struct {
-        ProjectName  string
-        Description  string
-        Environments []string
-    }
+	// Collect project information
+	var answers struct {
+		ProjectName  string
+		Description  string
+		Environments []string
+	}
 
-    questions := []*survey.Question{
-        {
-            Name: "ProjectName",
-            Prompt: &survey.Input{
-                Message: "Project name:",
-                Default: projectName,
-            },
-            Validate: survey.Required,
-        },
-        {
-            Name: "Description",
-            Prompt: &survey.Input{
-                Message: "Project description:",
-                Default: "Environment configuration for " + projectName,
-            },
-        },
-        {
-            Name: "Environments",
-            Prompt: &survey.MultiSelect{
-                Message: "Select environments to create:",
-                Options: []string{"development", "staging", "production", "testing"},
-                Default: []string{"development", "staging", "production"},
-            },
-        },
-    }
+	questions := []*survey.Question{
+		{
+			Name: "ProjectName",
+			Prompt: &survey.Input{
+				Message: "Project name:",
+				Default: projectName,
+			},
+			Validate: survey.Required,
+		},
+		{
+			Name: "Description",
+			Prompt: &survey.Input{
+				Message: "Project description:",
+				Default: "Environment configuration for " + projectName,
+			},
+		},
+		{
+			Name: "Environments",
+			Prompt: &survey.MultiSelect{
+				Message: "Select environments to create:",
+				Options: []string{"development", "staging", "production", "testing"},
+				Default: []string{"development", "staging", "production"},
+			},
+		},
+	}
 
-    if err := survey.Ask(questions, &answers); err != nil {
-        return err
-    }
+	if err := survey.Ask(questions, &answers); err != nil {
+		return err
+	}
 
-    // Create .vaultenv directory
-    ui.StartProgress("Creating project structure", func() error {
-        return os.MkdirAll(configDir, 0755)
-    })
+	// Create .vaultenv directory
+	ui.StartProgress("Creating project structure", func() error {
+		return os.MkdirAll(configDir, 0755)
+	})
 
-    // Create config file
-    configContent := fmt.Sprintf(`# vaultenv Configuration
+	// Create config file
+	configContent := fmt.Sprintf(`# vaultenv Configuration
 # Project: %s
 
 project:
@@ -124,11 +124,11 @@ project:
 environments:
 `, answers.ProjectName, answers.ProjectName, answers.Description)
 
-    for _, env := range answers.Environments {
-        configContent += fmt.Sprintf("  - %s\n", env)
-    }
+	for _, env := range answers.Environments {
+		configContent += fmt.Sprintf("  - %s\n", env)
+	}
 
-    configContent += `
+	configContent += `
 # Security settings
 security:
   # Encryption algorithm (aes-gcm-256 or chacha20-poly1305)
@@ -158,15 +158,15 @@ sync:
   interval: 300s
 `
 
-    err = ui.StartProgress("Creating configuration", func() error {
-        return os.WriteFile(configFile, []byte(configContent), 0644)
-    })
-    if err != nil {
-        return err
-    }
+	err = ui.StartProgress("Creating configuration", func() error {
+		return os.WriteFile(configFile, []byte(configContent), 0644)
+	})
+	if err != nil {
+		return err
+	}
 
-    // Create .gitignore
-    gitignoreContent := `# vaultenv files
+	// Create .gitignore
+	gitignoreContent := `# vaultenv files
 *.enc
 *.key
 .vaultenv/data/
@@ -183,15 +183,15 @@ sync:
 !.env.*.example
 `
 
-    err = ui.StartProgress("Creating .gitignore", func() error {
-        return os.WriteFile(filepath.Join(configDir, ".gitignore"), []byte(gitignoreContent), 0644)
-    })
-    if err != nil {
-        return err
-    }
+	err = ui.StartProgress("Creating .gitignore", func() error {
+		return os.WriteFile(filepath.Join(configDir, ".gitignore"), []byte(gitignoreContent), 0644)
+	})
+	if err != nil {
+		return err
+	}
 
-    // Create .env.example
-    envExampleContent := `# Example environment configuration
+	// Create .env.example
+	envExampleContent := `# Example environment configuration
 # Copy this file to .env and update with your values
 
 # Database
@@ -212,21 +212,21 @@ SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 `
 
-    err = ui.StartProgress("Creating .env.example", func() error {
-        return os.WriteFile(filepath.Join(currentDir, ".env.example"), []byte(envExampleContent), 0644)
-    })
-    if err != nil {
-        return err
-    }
+	err = ui.StartProgress("Creating .env.example", func() error {
+		return os.WriteFile(filepath.Join(currentDir, ".env.example"), []byte(envExampleContent), 0644)
+	})
+	if err != nil {
+		return err
+	}
 
-    // Success message
-    ui.Success("Project initialized successfully!")
-    fmt.Println()
-    ui.Info("Next steps:")
-    fmt.Println("  1. Review .vaultenv/config.yaml")
-    fmt.Println("  2. Copy .env.example to .env and add your variables")
-    fmt.Println("  3. Run 'vaultenv-cli set KEY=VALUE' to store variables")
-    fmt.Println("  4. Commit .vaultenv/config.yaml and .env.example to git")
+	// Success message
+	ui.Success("Project initialized successfully!")
+	fmt.Println()
+	ui.Info("Next steps:")
+	fmt.Println("  1. Review .vaultenv/config.yaml")
+	fmt.Println("  2. Copy .env.example to .env and add your variables")
+	fmt.Println("  3. Run 'vaultenv-cli set KEY=VALUE' to store variables")
+	fmt.Println("  4. Commit .vaultenv/config.yaml and .env.example to git")
 
-    return nil
+	return nil
 }

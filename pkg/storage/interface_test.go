@@ -11,7 +11,7 @@ func TestGetBackend(t *testing.T) {
 		t.Fatalf("GetBackend() error = %v", err)
 	}
 	defer backend.Close()
-	
+
 	// Should return a file backend by default
 	if _, ok := backend.(*FileBackend); !ok {
 		t.Error("GetBackend() did not return FileBackend")
@@ -77,7 +77,7 @@ func TestGetBackendWithOptions(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			backend, err := GetBackendWithOptions(tt.opts)
@@ -85,10 +85,10 @@ func TestGetBackendWithOptions(t *testing.T) {
 				t.Errorf("GetBackendWithOptions() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if err == nil {
 				defer backend.Close()
-				
+
 				// Verify correct backend type
 				switch tt.opts.Type {
 				case "file", "":
@@ -131,16 +131,16 @@ func TestTestBackend(t *testing.T) {
 	// Create a test backend
 	testBackend := NewMemoryBackend()
 	testBackend.Set("TEST_KEY", "test_value", false)
-	
+
 	// Set test backend
 	SetTestBackend(testBackend)
-	
+
 	// GetBackend should return test backend
 	backend, err := GetBackend("any-env")
 	if err != nil {
 		t.Fatalf("GetBackend() with test backend error = %v", err)
 	}
-	
+
 	// Verify it's the test backend
 	value, err := backend.Get("TEST_KEY")
 	if err != nil {
@@ -149,17 +149,17 @@ func TestTestBackend(t *testing.T) {
 	if value != "test_value" {
 		t.Errorf("Get() = %v, want test_value", value)
 	}
-	
+
 	// Reset test backend
 	ResetTestBackend()
-	
+
 	// GetBackend should now return regular backend
 	backend2, err := GetBackend("test-env")
 	if err != nil {
 		t.Fatalf("GetBackend() after reset error = %v", err)
 	}
 	defer backend2.Close()
-	
+
 	// Should not have test data
 	_, err = backend2.Get("TEST_KEY")
 	if err != ErrNotFound {
@@ -173,7 +173,7 @@ func TestBackendInterface(t *testing.T) {
 		NewMemoryBackend(),
 		// File, SQLite, and Git backends require paths, tested separately
 	}
-	
+
 	for _, backend := range backends {
 		// Test all interface methods exist
 		_ = backend.Set("key", "value", false)
@@ -190,11 +190,11 @@ func TestBackendErrors(t *testing.T) {
 	if ErrNotFound.Error() != "variable not found" {
 		t.Errorf("ErrNotFound = %v, want 'variable not found'", ErrNotFound)
 	}
-	
+
 	if ErrAlreadyExists.Error() != "variable already exists" {
 		t.Errorf("ErrAlreadyExists = %v, want 'variable already exists'", ErrAlreadyExists)
 	}
-	
+
 	if ErrInvalidName.Error() != "invalid variable name" {
 		t.Errorf("ErrInvalidName = %v, want 'invalid variable name'", ErrInvalidName)
 	}
@@ -214,29 +214,29 @@ func TestBackendCompatibility(t *testing.T) {
 		"UNICODE":   "Hello 世界",
 		"MULTILINE": "line1\nline2\nline3",
 	}
-	
+
 	// Create different backend types
 	memBackend := NewMemoryBackend()
-	
+
 	backends := []struct {
 		name    string
 		backend Backend
 	}{
 		{"memory", memBackend},
 	}
-	
+
 	for _, b := range backends {
 		t.Run(b.name, func(t *testing.T) {
 			backend := b.backend
 			defer backend.Close()
-			
+
 			// Test Set/Get
 			for key, value := range testData {
 				err := backend.Set(key, value, false)
 				if err != nil {
 					t.Errorf("Set(%s) error = %v", key, err)
 				}
-				
+
 				got, err := backend.Get(key)
 				if err != nil {
 					t.Errorf("Get(%s) error = %v", key, err)
@@ -245,7 +245,7 @@ func TestBackendCompatibility(t *testing.T) {
 					t.Errorf("Get(%s) = %v, want %v", key, got, value)
 				}
 			}
-			
+
 			// Test List
 			keys, err := backend.List()
 			if err != nil {
@@ -254,7 +254,7 @@ func TestBackendCompatibility(t *testing.T) {
 			if len(keys) != len(testData) {
 				t.Errorf("List() returned %d keys, want %d", len(keys), len(testData))
 			}
-			
+
 			// Test Exists
 			exists, err := backend.Exists("KEY1")
 			if err != nil {
@@ -263,7 +263,7 @@ func TestBackendCompatibility(t *testing.T) {
 			if !exists {
 				t.Error("Exists() = false, want true")
 			}
-			
+
 			exists, err = backend.Exists("NONEXISTENT")
 			if err != nil {
 				t.Errorf("Exists() error = %v", err)
@@ -271,24 +271,24 @@ func TestBackendCompatibility(t *testing.T) {
 			if exists {
 				t.Error("Exists() = true for non-existent key")
 			}
-			
+
 			// Test Delete
 			err = backend.Delete("KEY1")
 			if err != nil {
 				t.Errorf("Delete() error = %v", err)
 			}
-			
+
 			_, err = backend.Get("KEY1")
 			if err != ErrNotFound {
 				t.Error("Get() after Delete() should return ErrNotFound")
 			}
-			
+
 			// Test overwrite
 			err = backend.Set("KEY2", "updated value", false)
 			if err != nil {
 				t.Errorf("Set() overwrite error = %v", err)
 			}
-			
+
 			value, _ := backend.Get("KEY2")
 			if value != "updated value" {
 				t.Errorf("Get() after overwrite = %v, want 'updated value'", value)

@@ -62,8 +62,8 @@ type AccessConfig struct {
 
 // EnvironmentAccess defines access rules for an environment
 type EnvironmentAccess struct {
-	AllowedUsers []string `json:"allowed_users"`
-	AllowedRoles []string `json:"allowed_roles"`
+	AllowedUsers []string      `json:"allowed_users"`
+	AllowedRoles []string      `json:"allowed_roles"`
 	Entries      []AccessEntry `json:"entries"`
 }
 
@@ -153,7 +153,7 @@ func (l *LocalAccessControl) GrantAccess(user, environment string, level AccessL
 	}
 
 	envConfig.Entries = append(envConfig.Entries, entry)
-	
+
 	// Also add to allowed users if not already present
 	if !contains(envConfig.AllowedUsers, user) {
 		envConfig.AllowedUsers = append(envConfig.AllowedUsers, user)

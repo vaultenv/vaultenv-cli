@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -43,10 +44,11 @@ var (
 
 // PasswordManager handles password operations and key derivation
 type PasswordManager struct {
-	keystore     *keystore.Keystore
+	keystore              *keystore.Keystore
 	environmentKeyManager *keystore.EnvironmentKeyManager
-	config       *config.Config
-	sessionCache map[string]*sessionEntry
+	config                *config.Config
+	sessionCache          map[string]*sessionEntry
+	cacheMutex            sync.RWMutex
 }
 
 type sessionEntry struct {
@@ -60,51 +62,64 @@ func NewPasswordManager(ks *keystore.Keystore, cfg *config.Config) *PasswordMana
 	return &PasswordManager{
 		keystore:              ks,
 		environmentKeyManager: envKeyManager,
-		config:               cfg,
+		config:                cfg,
 		sessionCache:          make(map[string]*sessionEntry),
 	}
 }
 
 // PromptPassword prompts the user for a password with the given prompt message
 func (pm *PasswordManager) PromptPassword(prompt string) (string, error) {
+	// Check environment variable first
+	if password, exists := pm.GetPasswordFromEnv(); exists {
+		return password, nil
+	}
+
 	fmt.Print(prompt)
-	
+
 	// Read password from terminal without echoing
 	password, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println() // Add newline after password input
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to read password: %w", err)
 	}
-	
+
 	passwordStr := string(password)
 	if passwordStr == "" {
 		return "", ErrNoPasswordProvided
 	}
-	
+
 	return passwordStr, nil
 }
 
 // PromptNewPassword prompts for a new password with confirmation
 func (pm *PasswordManager) PromptNewPassword() (string, error) {
+	// Check environment variable first for non-interactive mode
+	if envPassword, exists := pm.GetPasswordFromEnv(); exists {
+		if len(envPassword) < 8 {
+			return "", ErrPasswordTooShort
+		}
+		return envPassword, nil
+	}
+
 	password, err := pm.PromptPassword("Enter password: ")
 	if err != nil {
 		return "", err
 	}
-	
+
 	if len(password) < 8 {
 		return "", ErrPasswordTooShort
 	}
-	
+
 	confirm, err := pm.PromptPassword("Confirm password: ")
 	if err != nil {
 		return "", err
 	}
-	
+
 	if password != confirm {
 		return "", ErrPasswordMismatch
 	}
-	
+
 	return password, nil
 }
 
@@ -134,14 +149,21 @@ func (pm *PasswordManager) GenerateSalt() ([]byte, error) {
 func (pm *PasswordManager) GetOrCreateMasterKey(projectID string) ([]byte, error) {
 	// Check session cache first
 	cacheKey := pm.getCacheKey(projectID)
+	pm.cacheMutex.RLock()
 	if entry, ok := pm.sessionCache[cacheKey]; ok {
 		if time.Now().Before(entry.expiresAt) {
+			pm.cacheMutex.RUnlock()
 			return entry.key, nil
 		}
-		// Clean up expired entry
+		// Need to clean up expired entry
+		pm.cacheMutex.RUnlock()
+		pm.cacheMutex.Lock()
 		delete(pm.sessionCache, cacheKey)
+		pm.cacheMutex.Unlock()
+	} else {
+		pm.cacheMutex.RUnlock()
 	}
-	
+
 	// Try to get existing key from keystore
 	existingKey, err := pm.keystore.GetKey(projectID)
 	if err == nil && existingKey != nil {
@@ -150,37 +172,37 @@ func (pm *PasswordManager) GetOrCreateMasterKey(projectID string) ([]byte, error
 		if err != nil {
 			return nil, err
 		}
-		
+
 		key := pm.DeriveKey(password, existingKey.Salt)
-		
+
 		// Verify the key by checking the verification hash
 		if !pm.verifyKey(key, existingKey.VerificationHash) {
 			return nil, ErrInvalidPassword
 		}
-		
+
 		// Cache the key for the session
 		pm.cacheSessionKey(projectID, key)
-		
+
 		return key, nil
 	}
-	
+
 	// Create new key
 	fmt.Println("Creating new master key for project...")
 	password, err := pm.PromptNewPassword()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	salt, err := pm.GenerateSalt()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	key := pm.DeriveKey(password, salt)
-	
+
 	// Generate verification hash
 	verificationHash := pm.generateVerificationHash(key)
-	
+
 	// Store in keystore
 	keyEntry := &keystore.KeyEntry{
 		ProjectID:        projectID,
@@ -188,14 +210,14 @@ func (pm *PasswordManager) GetOrCreateMasterKey(projectID string) ([]byte, error
 		VerificationHash: verificationHash,
 		CreatedAt:        time.Now(),
 	}
-	
+
 	if err := pm.keystore.StoreKey(projectID, keyEntry); err != nil {
 		return nil, fmt.Errorf("failed to store key: %w", err)
 	}
-	
+
 	// Cache the key for the session
 	pm.cacheSessionKey(projectID, key)
-	
+
 	return key, nil
 }
 
@@ -205,13 +227,13 @@ func (pm *PasswordManager) VerifyPassword(projectID, password string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get key: %w", err)
 	}
-	
+
 	key := pm.DeriveKey(password, keyEntry.Salt)
-	
+
 	if !pm.verifyKey(key, keyEntry.VerificationHash) {
 		return ErrInvalidPassword
 	}
-	
+
 	return nil
 }
 
@@ -222,29 +244,29 @@ func (pm *PasswordManager) ChangePassword(projectID string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	if err := pm.VerifyPassword(projectID, currentPassword); err != nil {
 		return err
 	}
-	
+
 	// Get new password
 	newPassword, err := pm.PromptNewPassword()
 	if err != nil {
 		return err
 	}
-	
+
 	// Generate new salt
 	salt, err := pm.GenerateSalt()
 	if err != nil {
 		return err
 	}
-	
+
 	// Derive new key
 	newKey := pm.DeriveKey(newPassword, salt)
-	
+
 	// Generate new verification hash
 	verificationHash := pm.generateVerificationHash(newKey)
-	
+
 	// Update keystore
 	keyEntry := &keystore.KeyEntry{
 		ProjectID:        projectID,
@@ -252,25 +274,31 @@ func (pm *PasswordManager) ChangePassword(projectID string) error {
 		VerificationHash: verificationHash,
 		CreatedAt:        time.Now(),
 	}
-	
+
 	if err := pm.keystore.StoreKey(projectID, keyEntry); err != nil {
 		return fmt.Errorf("failed to update key: %w", err)
 	}
-	
+
 	// Clear session cache for this project
+	pm.cacheMutex.Lock()
 	delete(pm.sessionCache, pm.getCacheKey(projectID))
-	
+	pm.cacheMutex.Unlock()
+
 	fmt.Println("Password changed successfully")
 	return nil
 }
 
 // ClearSessionCache clears all cached session keys
 func (pm *PasswordManager) ClearSessionCache() {
+	pm.cacheMutex.Lock()
+	defer pm.cacheMutex.Unlock()
 	pm.sessionCache = make(map[string]*sessionEntry)
 }
 
 // ClearProjectCache clears cached session key for a specific project
 func (pm *PasswordManager) ClearProjectCache(projectID string) {
+	pm.cacheMutex.Lock()
+	defer pm.cacheMutex.Unlock()
 	delete(pm.sessionCache, pm.getCacheKey(projectID))
 }
 
@@ -289,6 +317,8 @@ func (pm *PasswordManager) verifyKey(key []byte, verificationHash string) bool {
 }
 
 func (pm *PasswordManager) cacheSessionKey(projectID string, key []byte) {
+	pm.cacheMutex.Lock()
+	defer pm.cacheMutex.Unlock()
 	cacheKey := pm.getCacheKey(projectID)
 	pm.sessionCache[cacheKey] = &sessionEntry{
 		key:       key,
@@ -316,19 +346,19 @@ func (pm *PasswordManager) ExportKey(projectID string, password string) (string,
 	if err != nil {
 		return "", fmt.Errorf("failed to get key: %w", err)
 	}
-	
+
 	// Verify password
 	key := pm.DeriveKey(password, keyEntry.Salt)
 	if !pm.verifyKey(key, keyEntry.VerificationHash) {
 		return "", ErrInvalidPassword
 	}
-	
+
 	// Create export data
 	exportData := fmt.Sprintf("vaultenv:v1:%s:%s",
 		base64.StdEncoding.EncodeToString(keyEntry.Salt),
 		keyEntry.VerificationHash,
 	)
-	
+
 	return exportData, nil
 }
 
@@ -338,20 +368,20 @@ func (pm *PasswordManager) ImportKey(projectID string, exportData string, passwo
 	if len(parts) != 4 || parts[0] != "vaultenv" || parts[1] != "v1" {
 		return errors.New("invalid export format")
 	}
-	
+
 	salt, err := base64.StdEncoding.DecodeString(parts[2])
 	if err != nil {
 		return fmt.Errorf("invalid salt format: %w", err)
 	}
-	
+
 	verificationHash := parts[3]
-	
+
 	// Verify the password works with imported data
 	key := pm.DeriveKey(password, salt)
 	if !pm.verifyKey(key, verificationHash) {
 		return ErrInvalidPassword
 	}
-	
+
 	// Store in keystore
 	keyEntry := &keystore.KeyEntry{
 		ProjectID:        projectID,
@@ -359,33 +389,40 @@ func (pm *PasswordManager) ImportKey(projectID string, exportData string, passwo
 		VerificationHash: verificationHash,
 		CreatedAt:        time.Now(),
 	}
-	
+
 	if err := pm.keystore.StoreKey(projectID, keyEntry); err != nil {
 		return fmt.Errorf("failed to store imported key: %w", err)
 	}
-	
+
 	return nil
 }
 
 // GetOrCreateEnvironmentKey gets the encryption key for a specific environment, creating it if necessary
 func (pm *PasswordManager) GetOrCreateEnvironmentKey(environment string) ([]byte, error) {
 	projectID := pm.config.Project.ID
-	
+
 	// If per-environment passwords are disabled, fall back to project-level key
 	if !pm.config.IsPerEnvironmentPasswordsEnabled() {
 		return pm.GetOrCreateMasterKey(projectID)
 	}
-	
+
 	// Check session cache first
 	cacheKey := pm.getEnvironmentCacheKey(projectID, environment)
+	pm.cacheMutex.RLock()
 	if entry, ok := pm.sessionCache[cacheKey]; ok {
 		if time.Now().Before(entry.expiresAt) {
+			pm.cacheMutex.RUnlock()
 			return entry.key, nil
 		}
-		// Clean up expired entry
+		// Need to clean up expired entry
+		pm.cacheMutex.RUnlock()
+		pm.cacheMutex.Lock()
 		delete(pm.sessionCache, cacheKey)
+		pm.cacheMutex.Unlock()
+	} else {
+		pm.cacheMutex.RUnlock()
 	}
-	
+
 	// Try to get existing key from environment-specific keystore
 	if pm.environmentKeyManager.HasEnvironmentKey(environment) {
 		// Prompt for password with environment context
@@ -393,29 +430,29 @@ func (pm *PasswordManager) GetOrCreateEnvironmentKey(environment string) ([]byte
 		if err != nil {
 			return nil, err
 		}
-		
+
 		key, err := pm.environmentKeyManager.GetOrCreateEnvironmentKey(environment, password)
 		if err != nil {
 			return nil, err
 		}
-		
+
 		// Cache the key for the session
 		pm.cacheEnvironmentKey(projectID, environment, key)
 		return key, nil
 	}
-	
+
 	// Create new environment key
 	ui.Info("Creating new encryption key for environment: %s", environment)
 	password, err := pm.PromptNewEnvironmentPassword(environment)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	key, err := pm.environmentKeyManager.GetOrCreateEnvironmentKey(environment, password)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Cache the key for the session
 	pm.cacheEnvironmentKey(projectID, environment, key)
 	return key, nil
@@ -428,12 +465,12 @@ func (pm *PasswordManager) PromptEnvironmentPassword(environment, prompt string)
 	if password := os.Getenv(envVar); password != "" {
 		return password, nil
 	}
-	
+
 	// Fall back to generic environment variable
 	if password, exists := pm.GetPasswordFromEnv(); exists {
 		return password, nil
 	}
-	
+
 	// Prompt user with environment context
 	fullPrompt := fmt.Sprintf("[%s] %s", environment, prompt)
 	return pm.PromptPassword(fullPrompt)
@@ -442,7 +479,7 @@ func (pm *PasswordManager) PromptEnvironmentPassword(environment, prompt string)
 // PromptNewEnvironmentPassword prompts for a new password for an environment with policy validation
 func (pm *PasswordManager) PromptNewEnvironmentPassword(environment string) (string, error) {
 	policy := pm.config.GetPasswordPolicy(environment)
-	
+
 	ui.Info("Setting up password for environment: %s", environment)
 	if policy.MinLength > 8 {
 		ui.Info("Password policy requires: minimum %d characters", policy.MinLength)
@@ -462,29 +499,29 @@ func (pm *PasswordManager) PromptNewEnvironmentPassword(environment string) (str
 			ui.Info("  - Cannot be a common password")
 		}
 	}
-	
+
 	for {
 		password, err := pm.PromptEnvironmentPassword(environment, "Enter password: ")
 		if err != nil {
 			return "", err
 		}
-		
+
 		// Validate against policy
 		if err := pm.validatePasswordPolicy(password, policy); err != nil {
 			ui.Error("Password validation failed: %v", err)
 			continue
 		}
-		
+
 		confirm, err := pm.PromptEnvironmentPassword(environment, "Confirm password: ")
 		if err != nil {
 			return "", err
 		}
-		
+
 		if password != confirm {
 			ui.Error("Passwords do not match, please try again")
 			continue
 		}
-		
+
 		return password, nil
 	}
 }
@@ -494,27 +531,27 @@ func (pm *PasswordManager) validatePasswordPolicy(password string, policy config
 	if len(password) < policy.MinLength {
 		return fmt.Errorf("password must be at least %d characters long", policy.MinLength)
 	}
-	
+
 	if policy.RequireUpper && !containsUppercase(password) {
 		return fmt.Errorf("password must contain at least one uppercase letter")
 	}
-	
+
 	if policy.RequireLower && !containsLowercase(password) {
 		return fmt.Errorf("password must contain at least one lowercase letter")
 	}
-	
+
 	if policy.RequireNumbers && !containsNumber(password) {
 		return fmt.Errorf("password must contain at least one number")
 	}
-	
+
 	if policy.RequireSpecial && !containsSpecial(password) {
 		return fmt.Errorf("password must contain at least one special character")
 	}
-	
+
 	if policy.PreventCommon && isCommonPassword(password) {
 		return fmt.Errorf("this password is too common, please choose a more unique password")
 	}
-	
+
 	return nil
 }
 
@@ -523,41 +560,45 @@ func (pm *PasswordManager) ChangeEnvironmentPassword(environment string) error {
 	if !pm.config.IsPerEnvironmentPasswordsEnabled() {
 		return fmt.Errorf("per-environment passwords are not enabled for this project")
 	}
-	
+
 	// Verify current password
 	currentPassword, err := pm.PromptEnvironmentPassword(environment, "Enter current password: ")
 	if err != nil {
 		return err
 	}
-	
+
 	// Verify current password by attempting to derive key
 	_, err = pm.environmentKeyManager.GetOrCreateEnvironmentKey(environment, currentPassword)
 	if err != nil {
 		return fmt.Errorf("current password is incorrect: %w", err)
 	}
-	
+
 	// Get new password
 	newPassword, err := pm.PromptNewEnvironmentPassword(environment)
 	if err != nil {
 		return err
 	}
-	
+
 	// Change password using environment key manager
 	err = pm.environmentKeyManager.ChangeEnvironmentPassword(environment, currentPassword, newPassword)
 	if err != nil {
 		return fmt.Errorf("failed to change password: %w", err)
 	}
-	
+
 	// Clear session cache for this environment
 	cacheKey := pm.getEnvironmentCacheKey(pm.config.Project.ID, environment)
+	pm.cacheMutex.Lock()
 	delete(pm.sessionCache, cacheKey)
-	
+	pm.cacheMutex.Unlock()
+
 	ui.Success("Password changed successfully for environment: %s", environment)
 	return nil
 }
 
 // cacheEnvironmentKey caches an environment-specific key for the session
 func (pm *PasswordManager) cacheEnvironmentKey(projectID, environment string, key []byte) {
+	pm.cacheMutex.Lock()
+	defer pm.cacheMutex.Unlock()
 	cacheKey := pm.getEnvironmentCacheKey(projectID, environment)
 	pm.sessionCache[cacheKey] = &sessionEntry{
 		key:       key,
@@ -567,6 +608,8 @@ func (pm *PasswordManager) cacheEnvironmentKey(projectID, environment string, ke
 
 // ClearEnvironmentCache clears cached session key for a specific environment
 func (pm *PasswordManager) ClearEnvironmentCache(environment string) {
+	pm.cacheMutex.Lock()
+	defer pm.cacheMutex.Unlock()
 	cacheKey := pm.getEnvironmentCacheKey(pm.config.Project.ID, environment)
 	delete(pm.sessionCache, cacheKey)
 }
@@ -615,11 +658,11 @@ func containsSpecial(s string) bool {
 func isCommonPassword(password string) bool {
 	// Basic list of common passwords - in production, this would be a comprehensive list
 	commonPasswords := []string{
-		"password", "123456", "password123", "admin", "qwerty", 
+		"password", "123456", "password123", "admin", "qwerty",
 		"letmein", "welcome", "monkey", "1234567890", "abc123",
 		"Password1", "password1", "123456789", "welcome123",
 	}
-	
+
 	lowerPassword := strings.ToLower(password)
 	for _, common := range commonPasswords {
 		if lowerPassword == strings.ToLower(common) {

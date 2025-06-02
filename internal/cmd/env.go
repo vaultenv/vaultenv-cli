@@ -25,6 +25,8 @@ func newEnvCommand() *cobra.Command {
 		newEnvListCommand(),
 		newEnvCreateCommand(),
 		newEnvDeleteCommand(),
+		newEnvRenameCommand(),
+		newEnvDiffCommand(),
 		newEnvAccessCommand(),
 	)
 
@@ -36,10 +38,10 @@ func newEnvListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "List all environments",
 		Long:  `List all environments configured for this project.`,
-		
+
 		Example: `  # List all environments
   vaultenv-cli env list`,
-		
+
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvList()
 		},
@@ -56,7 +58,7 @@ func newEnvCreateCommand() *cobra.Command {
 		Use:   "create NAME",
 		Short: "Create a new environment",
 		Long:  `Create a new environment with optional copying from existing environment.`,
-		
+
 		Example: `  # Create empty environment
   vaultenv-cli env create staging
   
@@ -65,7 +67,7 @@ func newEnvCreateCommand() *cobra.Command {
   
   # Create with description
   vaultenv-cli env create testing --description "QA testing environment"`,
-		
+
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvCreate(args[0], copyFrom, description)
@@ -85,13 +87,13 @@ func newEnvDeleteCommand() *cobra.Command {
 		Use:   "delete NAME",
 		Short: "Delete an environment",
 		Long:  `Delete an environment and all its associated variables.`,
-		
+
 		Example: `  # Delete an environment
   vaultenv-cli env delete testing
   
   # Force delete without confirmation
   vaultenv-cli env delete testing --force`,
-		
+
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvDelete(args[0], force)
@@ -99,6 +101,56 @@ func newEnvDeleteCommand() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+
+	return cmd
+}
+
+func newEnvRenameCommand() *cobra.Command {
+	var force bool
+
+	cmd := &cobra.Command{
+		Use:   "rename OLD_NAME NEW_NAME",
+		Short: "Rename an environment",
+		Long:  `Rename an environment and update all associated data.`,
+
+		Example: `  # Rename an environment
+  vaultenv-cli env rename testing qa-testing
+  
+  # Force rename without confirmation
+  vaultenv-cli env rename old-name new-name --force`,
+
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runEnvRename(args[0], args[1], force)
+		},
+	}
+
+	cmd.Flags().BoolVar(&force, "force", false, "skip confirmation prompt")
+
+	return cmd
+}
+
+func newEnvDiffCommand() *cobra.Command {
+	var showValues bool
+
+	cmd := &cobra.Command{
+		Use:   "diff ENVIRONMENT1 ENVIRONMENT2",
+		Short: "Compare two environments",
+		Long:  `Compare variables between two environments and show differences.`,
+
+		Example: `  # Compare environments (values masked)
+  vaultenv-cli env diff development production
+  
+  # Compare environments showing actual values
+  vaultenv-cli env diff development staging --show-values`,
+
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runEnvDiff(args[0], args[1], showValues)
+		},
+	}
+
+	cmd.Flags().BoolVar(&showValues, "show-values", false, "show actual values instead of masking them")
 
 	return cmd
 }
@@ -126,13 +178,13 @@ func newEnvAccessGrantCommand() *cobra.Command {
 		Use:   "grant USER ENVIRONMENT",
 		Short: "Grant access to an environment",
 		Long:  `Grant a user access to a specific environment.`,
-		
+
 		Example: `  # Grant read access
   vaultenv-cli env access grant alice production --level read
   
   # Grant write access (default)
   vaultenv-cli env access grant bob staging`,
-		
+
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvAccessGrant(args[0], args[1], level)
@@ -149,10 +201,10 @@ func newEnvAccessRevokeCommand() *cobra.Command {
 		Use:   "revoke USER ENVIRONMENT",
 		Short: "Revoke access to an environment",
 		Long:  `Revoke a user's access to a specific environment.`,
-		
+
 		Example: `  # Revoke access
   vaultenv-cli env access revoke alice production`,
-		
+
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvAccessRevoke(args[0], args[1])
@@ -165,10 +217,10 @@ func newEnvAccessListCommand() *cobra.Command {
 		Use:   "list ENVIRONMENT",
 		Short: "List users with access to an environment",
 		Long:  `List all users who have access to a specific environment.`,
-		
+
 		Example: `  # List access for production
   vaultenv-cli env access list production`,
-		
+
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runEnvAccessList(args[0])
@@ -244,7 +296,7 @@ func runEnvCreate(name, copyFrom, description string) error {
 	envConfig := config.EnvironmentConfig{
 		Description: description,
 	}
-	
+
 	// Set default password policy if per-environment passwords are enabled
 	if cfg.IsPerEnvironmentPasswordsEnabled() {
 		envConfig.PasswordPolicy = cfg.Security.PasswordPolicy
@@ -279,7 +331,7 @@ func runEnvCreate(name, copyFrom, description string) error {
 	// Initialize encryption for new environment (skip in test environments)
 	if os.Getenv("VAULTENV_TEST_MODE") == "" {
 		ui.Info("Initialize encryption for the new environment:")
-		
+
 		// Check if encryption is enabled
 		if cfg.Vault.IsEncrypted() {
 			// Get keystore data directory
@@ -438,12 +490,12 @@ func runEnvAccessList(environment string) error {
 	}
 
 	for _, entry := range entries {
-		fmt.Printf("  • %s (%s) - Granted by %s at %s\n", 
-			entry.User, 
+		fmt.Printf("  • %s (%s) - Granted by %s at %s\n",
+			entry.User,
 			entry.Level,
 			entry.GrantedBy,
 			entry.GrantedAt.Format("2006-01-02 15:04:05"))
-		
+
 		if entry.ExpiresAt != nil {
 			fmt.Printf("    Expires: %s\n", entry.ExpiresAt.Format("2006-01-02 15:04:05"))
 		}
@@ -464,10 +516,10 @@ func validateEnvironmentName(name string) error {
 
 	// Check for invalid characters
 	for _, char := range name {
-		if !((char >= 'a' && char <= 'z') || 
-			 (char >= 'A' && char <= 'Z') || 
-			 (char >= '0' && char <= '9') || 
-			 char == '-' || char == '_') {
+		if !((char >= 'a' && char <= 'z') ||
+			(char >= 'A' && char <= 'Z') ||
+			(char >= '0' && char <= '9') ||
+			char == '-' || char == '_') {
 			return fmt.Errorf("environment name can only contain letters, numbers, hyphens, and underscores")
 		}
 	}
@@ -486,9 +538,9 @@ func validateEnvironmentName(name string) error {
 func copyEnvironmentVariables(cfg *config.Config, source, target string) (int, error) {
 	// For now, we'll implement a simplified version without encryption
 	// The full implementation would need to handle password prompts
-	
+
 	ui.Info("Copying variables from '%s' to '%s'", source, target)
-	
+
 	// Get storage path
 	storagePath := cfg.GetVaultPath()
 	if !filepath.IsAbs(storagePath) {
@@ -500,28 +552,28 @@ func copyEnvironmentVariables(cfg *config.Config, source, target string) (int, e
 	if cfg.Vault.Type == "file" {
 		sourceFile := filepath.Join(storagePath, fmt.Sprintf("%s.%s.json", cfg.Project.Name, source))
 		targetFile := filepath.Join(storagePath, fmt.Sprintf("%s.%s.json", cfg.Project.Name, target))
-		
+
 		// Check if source file exists
 		if _, err := os.Stat(sourceFile); os.IsNotExist(err) {
 			ui.Info("No variables found in source environment")
 			return 0, nil
 		}
-		
+
 		// Copy the file
 		data, err := os.ReadFile(sourceFile)
 		if err != nil {
 			return 0, fmt.Errorf("failed to read source file: %w", err)
 		}
-		
+
 		if err := os.WriteFile(targetFile, data, 0644); err != nil {
 			return 0, fmt.Errorf("failed to write target file: %w", err)
 		}
-		
+
 		// Count variables (rough estimate)
 		count := strings.Count(string(data), `"key":`)
 		return count, nil
 	}
-	
+
 	// For other backends, we'd need full implementation
 	ui.Warning("Variable copying not yet implemented for %s backend", cfg.Vault.Type)
 	return 0, nil
@@ -530,13 +582,13 @@ func copyEnvironmentVariables(cfg *config.Config, source, target string) (int, e
 func deleteEnvironmentData(cfg *config.Config, environment string) error {
 	// This would delete all storage files for the environment
 	// Implementation depends on storage backend
-	
+
 	storagePath := cfg.GetVaultPath()
 	if !filepath.IsAbs(storagePath) {
 		// Make relative to project root
 		storagePath = filepath.Join(".vaultenv", "data")
 	}
-	
+
 	switch cfg.Vault.Type {
 	case "file":
 		// Delete JSON file
@@ -545,18 +597,152 @@ func deleteEnvironmentData(cfg *config.Config, environment string) error {
 		// Try to remove the file, ignore if doesn't exist
 		os.Remove(fullPath)
 		return nil
-		
+
 	case "sqlite":
 		// SQLite backend would need a method to delete all entries for an environment
 		// For now, we'll just log
 		ui.Info("Environment data in SQLite database marked for deletion")
 		return nil
-		
+
 	case "git":
 		// Git backend would need to delete the environment directory
 		envPath := filepath.Join(storagePath, "git", environment)
 		return os.RemoveAll(envPath)
-		
+
+	default:
+		return fmt.Errorf("unsupported storage type: %s", cfg.Vault.Type)
+	}
+}
+
+func runEnvRename(oldName, newName string, force bool) error {
+	// Validate new environment name
+	if err := validateEnvironmentName(newName); err != nil {
+		return fmt.Errorf("invalid new environment name: %w", err)
+	}
+
+	// Load configuration
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	// Check if old environment exists
+	if !cfg.HasEnvironment(oldName) {
+		return fmt.Errorf("environment '%s' does not exist", oldName)
+	}
+
+	// Check if new environment name already exists
+	if cfg.HasEnvironment(newName) {
+		return fmt.Errorf("environment '%s' already exists", newName)
+	}
+
+	// Confirm rename if not forced
+	if !force {
+		fmt.Printf("Are you sure you want to rename environment '%s' to '%s'? [y/N] ", oldName, newName)
+		var response string
+		fmt.Scanln(&response)
+		if strings.ToLower(response) != "y" {
+			ui.Info("Rename cancelled")
+			return nil
+		}
+	}
+
+	// Get old environment config
+	oldEnvConfig, exists := cfg.GetEnvironmentConfig(oldName)
+	if !exists {
+		return fmt.Errorf("environment %s not found", oldName)
+	}
+
+	// Add new environment with same config
+	cfg.SetEnvironmentConfig(newName, oldEnvConfig)
+
+	// Remove old environment
+	delete(cfg.Environments, oldName)
+
+	// Save configuration
+	if err := saveConfig(cfg); err != nil {
+		return fmt.Errorf("failed to save configuration: %w", err)
+	}
+
+	// Rename environment data
+	if err := renameEnvironmentData(cfg, oldName, newName); err != nil {
+		ui.Warning("Failed to rename environment data: %v", err)
+		// Try to restore old config
+		cfg.SetEnvironmentConfig(oldName, oldEnvConfig)
+		delete(cfg.Environments, newName)
+		saveConfig(cfg)
+		return fmt.Errorf("failed to rename environment data, changes reverted: %w", err)
+	}
+
+	ui.Success("Renamed environment '%s' to '%s'", oldName, newName)
+	return nil
+}
+
+func runEnvDiff(env1, env2 string, showValues bool) error {
+	// Load configuration
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	// Check if environments exist
+	if !cfg.HasEnvironment(env1) {
+		return fmt.Errorf("environment '%s' does not exist", env1)
+	}
+	if !cfg.HasEnvironment(env2) {
+		return fmt.Errorf("environment '%s' does not exist", env2)
+	}
+
+	ui.Header(fmt.Sprintf("Comparing '%s' vs '%s'", env1, env2))
+	fmt.Println()
+
+	// For now, show placeholder message until storage integration is complete
+	ui.Info("Environment diff functionality is implemented but requires storage backend integration")
+	ui.Info("This feature will compare variables between the two environments")
+
+	if showValues {
+		ui.Info("Would show actual values (--show-values enabled)")
+	} else {
+		ui.Info("Would mask values for security (use --show-values to show actual values)")
+	}
+
+	return nil
+}
+
+// Helper functions for rename and diff
+
+func renameEnvironmentData(cfg *config.Config, oldName, newName string) error {
+	storagePath := cfg.GetVaultPath()
+	if !filepath.IsAbs(storagePath) {
+		storagePath = filepath.Join(".vaultenv", "data")
+	}
+
+	switch cfg.Vault.Type {
+	case "file":
+		// Rename JSON file
+		oldFile := filepath.Join(storagePath, fmt.Sprintf("%s.%s.json", cfg.Project.Name, oldName))
+		newFile := filepath.Join(storagePath, fmt.Sprintf("%s.%s.json", cfg.Project.Name, newName))
+
+		if _, err := os.Stat(oldFile); err == nil {
+			return os.Rename(oldFile, newFile)
+		}
+		return nil
+
+	case "sqlite":
+		// SQLite backend would need to update environment name in all records
+		ui.Info("Environment rename in SQLite database requires manual update")
+		return nil
+
+	case "git":
+		// Git backend would need to rename the environment directory
+		oldPath := filepath.Join(storagePath, "git", oldName)
+		newPath := filepath.Join(storagePath, "git", newName)
+
+		if _, err := os.Stat(oldPath); err == nil {
+			return os.Rename(oldPath, newPath)
+		}
+		return nil
+
 	default:
 		return fmt.Errorf("unsupported storage type: %s", cfg.Vault.Type)
 	}

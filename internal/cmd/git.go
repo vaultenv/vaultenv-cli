@@ -63,7 +63,7 @@ func newGitInitCommand() *cobra.Command {
 
 			// If both exist and no force flag, exit
 			if gitignoreExists && gitattributesExists && !force {
-				return fmt.Errorf("Git integration files already exist. Use --force to overwrite")
+				return fmt.Errorf("git integration files already exist. Use --force to overwrite")
 			}
 
 			gitBackend := &storage.GitBackend{}

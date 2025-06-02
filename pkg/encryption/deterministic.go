@@ -28,13 +28,13 @@ func (d *DeterministicEncryptor) EncryptDeterministic(plaintext []byte, key []by
 	// Derive a deterministic nonce from the plaintext and context
 	// This is safe when using unique keys per environment
 	nonce := d.deriveNonce(plaintext, key, context)
-	
+
 	// Use the AES-GCM encryptor's EncryptWithNonce method
 	gcmEncryptor, ok := d.baseEncryptor.(*AESGCMEncryptor)
 	if !ok {
 		return nil, fmt.Errorf("base encryptor must be AESGCMEncryptor for deterministic mode")
 	}
-	
+
 	return gcmEncryptor.EncryptWithNonce(plaintext, key, nonce)
 }
 
@@ -49,16 +49,16 @@ func (d *DeterministicEncryptor) DecryptDeterministic(ciphertext []byte, key []b
 func (d *DeterministicEncryptor) deriveNonce(plaintext, key, context []byte) []byte {
 	// Create HMAC with the key
 	h := hmac.New(sha256.New, key)
-	
+
 	// Write context first (e.g., variable name, environment)
 	h.Write(context)
-	
+
 	// Write separator to prevent collision between context and plaintext
 	h.Write([]byte{0x00})
-	
+
 	// Write plaintext
 	h.Write(plaintext)
-	
+
 	// Get hash and use first 12 bytes for GCM nonce
 	hash := h.Sum(nil)
 	return hash[:12]
@@ -94,12 +94,12 @@ func (d *DeterministicEncryptor) DecryptString(ciphertext string, key []byte) (s
 	if err != nil {
 		return "", fmt.Errorf("invalid base64: %w", err)
 	}
-	
+
 	plaintext, err := d.Decrypt(data, key)
 	if err != nil {
 		return "", err
 	}
-	
+
 	return string(plaintext), nil
 }
 

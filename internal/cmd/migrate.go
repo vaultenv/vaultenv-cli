@@ -110,7 +110,7 @@ func runMigrate(fromType, toType, environment string, force, dryRun bool) error 
 		if err != nil {
 			return fmt.Errorf("failed to initialize keystore: %w", err)
 		}
-		
+
 		pm := auth.NewPasswordManager(ks, cfg)
 
 		// Get or create encryption key
@@ -118,7 +118,7 @@ func runMigrate(fromType, toType, environment string, force, dryRun bool) error 
 		if err != nil {
 			return fmt.Errorf("failed to get encryption key: %w", err)
 		}
-		
+
 		// Convert key to string for storage options
 		password = string(key)
 		sourceOpts.Password = password
@@ -180,16 +180,16 @@ func runMigrate(fromType, toType, environment string, force, dryRun bool) error 
 
 	// Migrate variables
 	ui.Info("\nMigrating variables to %s storage...", toType)
-	
+
 	migrated := 0
 	for key, value := range variables {
 		fmt.Printf("  Migrating %s...\n", key)
-		
+
 		// Set in destination (encryption will be handled by the backend)
 		if err := dest.Set(key, value, false); err != nil {
 			return fmt.Errorf("failed to migrate %s: %w", key, err)
 		}
-		
+
 		migrated++
 	}
 
@@ -202,7 +202,7 @@ func runMigrate(fromType, toType, environment string, force, dryRun bool) error 
 		ui.Success("Updated configuration to use %s storage", toType)
 	}
 
-	ui.Success("\n✅ Successfully migrated %d variables from %s to %s storage", 
+	ui.Success("\n✅ Successfully migrated %d variables from %s to %s storage",
 		migrated, fromType, toType)
 
 	// Show additional information based on storage type
@@ -215,7 +215,7 @@ func runMigrate(fromType, toType, environment string, force, dryRun bool) error 
 		fmt.Println("\nTry these commands:")
 		fmt.Printf("  vaultenv history <KEY> --env %s\n", environment)
 		fmt.Printf("  vaultenv audit --env %s\n", environment)
-	
+
 	case "git":
 		ui.Info("\nGit storage features now available:")
 		fmt.Println("  • Each variable stored in a separate file")

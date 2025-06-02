@@ -47,33 +47,33 @@ func NewSQLiteBackend(basePath, environment string) (*SQLiteBackend, error) {
 	// Create database directory
 	dbPath := filepath.Join(basePath, "vaultenv.db")
 	dbDir := filepath.Dir(dbPath)
-	
+
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
-	
+
 	// Open database with WAL mode for better concurrency
 	db, err := sql.Open("sqlite3", dbPath+"?mode=rwc&_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
-	
+
 	// Set connection pool settings for better concurrency
 	db.SetMaxOpenConns(1) // SQLite performs best with a single connection
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(0)
-	
+
 	backend := &SQLiteBackend{
 		db:          db,
 		environment: environment,
 	}
-	
+
 	// Initialize schema
 	if err := backend.initSchema(); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("failed to initialize schema: %w", err)
 	}
-	
+
 	return backend, nil
 }
 
@@ -120,7 +120,7 @@ func (s *SQLiteBackend) initSchema() error {
 		error_message TEXT
 	);
 	`
-	
+
 	_, err := s.db.Exec(schema)
 	return err
 }
@@ -132,7 +132,7 @@ func (s *SQLiteBackend) Set(key, value string, encrypt bool) error {
 		return err
 	}
 	defer tx.Rollback()
-	
+
 	// Check if key exists
 	var id int64
 	var version int
@@ -140,18 +140,18 @@ func (s *SQLiteBackend) Set(key, value string, encrypt bool) error {
 		SELECT id, version FROM secrets 
 		WHERE environment = ? AND key = ?
 	`, s.environment, key).Scan(&id, &version)
-	
+
 	if err == sql.ErrNoRows {
 		// Insert new secret
 		result, err := tx.Exec(`
 			INSERT INTO secrets (environment, key, value, created_by, updated_by)
 			VALUES (?, ?, ?, ?, ?)
 		`, s.environment, key, value, getCurrentUser(), getCurrentUser())
-		
+
 		if err != nil {
 			return fmt.Errorf("failed to insert secret: %w", err)
 		}
-		
+
 		id, _ = result.LastInsertId()
 		version = 1
 	} else if err != nil {
@@ -165,32 +165,32 @@ func (s *SQLiteBackend) Set(key, value string, encrypt bool) error {
 				updated_by = ?, version = ?
 			WHERE id = ?
 		`, value, getCurrentUser(), version, id)
-		
+
 		if err != nil {
 			return fmt.Errorf("failed to update secret: %w", err)
 		}
 	}
-	
+
 	// Add to history
 	_, err = tx.Exec(`
 		INSERT INTO secret_history (secret_id, environment, key, value, version, changed_by, change_type)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`, id, s.environment, key, value, version, getCurrentUser(), "SET")
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to add history: %w", err)
 	}
-	
+
 	// Add audit log
 	_, err = tx.Exec(`
 		INSERT INTO audit_log (environment, action, key, user, success)
 		VALUES (?, ?, ?, ?, ?)
 	`, s.environment, "SET", key, getCurrentUser(), true)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to add audit log: %w", err)
 	}
-	
+
 	return tx.Commit()
 }
 
@@ -201,7 +201,7 @@ func (s *SQLiteBackend) Get(key string) (string, error) {
 		SELECT value FROM secrets 
 		WHERE environment = ? AND key = ?
 	`, s.environment, key).Scan(&value)
-	
+
 	// Add audit log (async to not slow down reads)
 	success := err == nil
 	go func() {
@@ -210,15 +210,15 @@ func (s *SQLiteBackend) Get(key string) (string, error) {
 			VALUES (?, ?, ?, ?, ?)
 		`, s.environment, "GET", key, getCurrentUser(), success)
 	}()
-	
+
 	if err == sql.ErrNoRows {
 		return "", ErrNotFound
 	}
-	
+
 	if err != nil {
 		return "", fmt.Errorf("failed to get secret: %w", err)
 	}
-	
+
 	return value, nil
 }
 
@@ -229,11 +229,11 @@ func (s *SQLiteBackend) Exists(key string) (bool, error) {
 		SELECT COUNT(*) FROM secrets 
 		WHERE environment = ? AND key = ?
 	`, s.environment, key).Scan(&count)
-	
+
 	if err != nil {
 		return false, fmt.Errorf("failed to check existence: %w", err)
 	}
-	
+
 	return count > 0, nil
 }
 
@@ -244,7 +244,7 @@ func (s *SQLiteBackend) Delete(key string) error {
 		return err
 	}
 	defer tx.Rollback()
-	
+
 	// Get secret ID for history
 	var id int64
 	var version int
@@ -252,46 +252,46 @@ func (s *SQLiteBackend) Delete(key string) error {
 		SELECT id, version FROM secrets 
 		WHERE environment = ? AND key = ?
 	`, s.environment, key).Scan(&id, &version)
-	
+
 	if err == sql.ErrNoRows {
 		// Key doesn't exist, nothing to delete
 		return nil
 	}
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to query secret: %w", err)
 	}
-	
+
 	// Add to history before deletion
 	_, err = tx.Exec(`
 		INSERT INTO secret_history (secret_id, environment, key, value, version, changed_by, change_type)
 		SELECT id, environment, key, value, version+1, ?, 'DELETE'
 		FROM secrets WHERE id = ?
 	`, getCurrentUser(), id)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to add history: %w", err)
 	}
-	
+
 	// Delete the secret
 	_, err = tx.Exec(`
 		DELETE FROM secrets WHERE id = ?
 	`, id)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to delete secret: %w", err)
 	}
-	
+
 	// Add audit log
 	_, err = tx.Exec(`
 		INSERT INTO audit_log (environment, action, key, user, success)
 		VALUES (?, ?, ?, ?, ?)
 	`, s.environment, "DELETE", key, getCurrentUser(), true)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to add audit log: %w", err)
 	}
-	
+
 	return tx.Commit()
 }
 
@@ -302,12 +302,12 @@ func (s *SQLiteBackend) List() ([]string, error) {
 		WHERE environment = ?
 		ORDER BY key
 	`, s.environment)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to list secrets: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var keys []string
 	for rows.Next() {
 		var key string
@@ -316,7 +316,7 @@ func (s *SQLiteBackend) List() ([]string, error) {
 		}
 		keys = append(keys, key)
 	}
-	
+
 	// Add audit log for LIST operation
 	go func() {
 		s.db.Exec(`
@@ -324,7 +324,7 @@ func (s *SQLiteBackend) List() ([]string, error) {
 			VALUES (?, ?, ?, ?, ?)
 		`, s.environment, "LIST", "", getCurrentUser(), true)
 	}()
-	
+
 	return keys, rows.Err()
 }
 
@@ -342,12 +342,12 @@ func (s *SQLiteBackend) GetHistory(key string, limit int) ([]SecretHistory, erro
 		ORDER BY version DESC
 		LIMIT ?
 	`, s.environment, key, limit)
-	
+
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var history []SecretHistory
 	for rows.Next() {
 		var h SecretHistory
@@ -357,7 +357,7 @@ func (s *SQLiteBackend) GetHistory(key string, limit int) ([]SecretHistory, erro
 		}
 		history = append(history, h)
 	}
-	
+
 	return history, rows.Err()
 }
 
@@ -370,12 +370,12 @@ func (s *SQLiteBackend) GetAuditLog(limit int) ([]AuditEntry, error) {
 		ORDER BY timestamp DESC
 		LIMIT ?
 	`, s.environment, limit)
-	
+
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var entries []AuditEntry
 	for rows.Next() {
 		var e AuditEntry
@@ -389,7 +389,7 @@ func (s *SQLiteBackend) GetAuditLog(limit int) ([]AuditEntry, error) {
 		}
 		entries = append(entries, e)
 	}
-	
+
 	return entries, rows.Err()
 }
 

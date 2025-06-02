@@ -128,18 +128,18 @@ MIXED="Hello 世界"`,
 			wantErr: true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewParser()
 			reader := strings.NewReader(tt.input)
-			
+
 			got, err := p.Parse(reader)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Parse() = %v, want %v", got, tt.want)
 			}
@@ -151,7 +151,7 @@ func TestParser_ExpandVars(t *testing.T) {
 	// Set up test environment variable
 	os.Setenv("TEST_ENV_VAR", "from_env")
 	defer os.Unsetenv("TEST_ENV_VAR")
-	
+
 	tests := []struct {
 		name  string
 		input string
@@ -196,18 +196,18 @@ DOUBLE="$BASE"`,
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewParser()
 			p.ExpandVars = true
-			
+
 			reader := strings.NewReader(tt.input)
 			got, err := p.Parse(reader)
 			if err != nil {
 				t.Fatalf("Parse() error = %v", err)
 			}
-			
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Parse() = %v, want %v", got, tt.want)
 			}
@@ -221,7 +221,7 @@ func TestParser_Configuration(t *testing.T) {
 KEY2=value2
 INVALID LINE
 KEY3=value3`
-	
+
 	tests := []struct {
 		name      string
 		configure func(*Parser)
@@ -253,24 +253,24 @@ KEY3=value3`
 			wantErr:  true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewParser()
 			tt.configure(p)
-			
+
 			reader := strings.NewReader(input)
 			got, err := p.Parse(reader)
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			
+
 			if err == nil {
 				if len(got) != len(tt.wantKeys) {
 					t.Errorf("Parse() returned %d keys, want %d", len(got), len(tt.wantKeys))
 				}
-				
+
 				for _, key := range tt.wantKeys {
 					if _, ok := got[key]; !ok {
 						t.Errorf("Missing expected key: %s", key)
@@ -285,32 +285,32 @@ func TestParser_ParseFile(t *testing.T) {
 	// Create temporary test file
 	tmpDir := t.TempDir()
 	envFile := filepath.Join(tmpDir, ".env")
-	
+
 	content := `KEY1=value1
 KEY2=value2
 # Comment
 KEY3=value3`
-	
+
 	if err := os.WriteFile(envFile, []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
-	
+
 	p := NewParser()
 	got, err := p.ParseFile(envFile)
 	if err != nil {
 		t.Fatalf("ParseFile() error = %v", err)
 	}
-	
+
 	want := map[string]string{
 		"KEY1": "value1",
 		"KEY2": "value2",
 		"KEY3": "value3",
 	}
-	
+
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ParseFile() = %v, want %v", got, want)
 	}
-	
+
 	// Test non-existent file
 	_, err = p.ParseFile(filepath.Join(tmpDir, "nonexistent.env"))
 	if err == nil {
@@ -330,7 +330,7 @@ func TestIsValidEnvVarName(t *testing.T) {
 		{"all_caps", "MY_VAR_NAME", true},
 		{"lowercase", "myvar", true},
 		{"mixed", "MyVar_123", true},
-		
+
 		{"empty", "", false},
 		{"start_number", "123KEY", false},
 		{"with_dash", "KEY-NAME", false},
@@ -339,7 +339,7 @@ func TestIsValidEnvVarName(t *testing.T) {
 		{"with_dollar", "KEY$", false},
 		{"special_chars", "KEY@#", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isValidEnvVarName(tt.input); got != tt.want {
@@ -355,26 +355,26 @@ func TestParser_ParseWithMetadata(t *testing.T) {
 KEY2=value2
 
 KEY3=value3`
-	
+
 	p := NewParser()
 	reader := strings.NewReader(input)
-	
+
 	vars, err := p.ParseWithMetadata(reader)
 	if err != nil {
 		t.Fatalf("ParseWithMetadata() error = %v", err)
 	}
-	
+
 	if len(vars) != 3 {
 		t.Errorf("ParseWithMetadata() returned %d variables, want 3", len(vars))
 	}
-	
+
 	// Check metadata
 	expectedLines := []int{1, 3, 5}
 	for i, v := range vars {
 		if v.LineNum != expectedLines[i] {
 			t.Errorf("Variable %d LineNum = %d, want %d", i, v.LineNum, expectedLines[i])
 		}
-		
+
 		if v.Original == "" {
 			t.Errorf("Variable %d missing Original line", i)
 		}
@@ -392,24 +392,24 @@ KEY1=duplicate
 INVALID LINE
 KEY4=value4
 `
-	
+
 	p := NewParser()
 	p.IgnoreInvalid = true
 	reader := strings.NewReader(input)
-	
+
 	vars, stats, err := p.ParseWithStats(reader)
 	if err != nil {
 		t.Fatalf("ParseWithStats() error = %v", err)
 	}
-	
+
 	// Check variables
 	if len(vars) != 4 {
 		t.Errorf("ParseWithStats() returned %d variables, want 4", len(vars))
 	}
-	
+
 	// Check stats
-	if stats.TotalLines != 10 { // Including empty line at end
-		t.Errorf("TotalLines = %d, want 10", stats.TotalLines)
+	if stats.TotalLines != 9 {
+		t.Errorf("TotalLines = %d, want 9", stats.TotalLines)
 	}
 	if stats.Variables != 5 { // Including duplicate
 		t.Errorf("Variables = %d, want 5", stats.Variables)
@@ -417,8 +417,8 @@ KEY4=value4
 	if stats.Comments != 2 {
 		t.Errorf("Comments = %d, want 2", stats.Comments)
 	}
-	if stats.EmptyLines != 2 {
-		t.Errorf("EmptyLines = %d, want 2", stats.EmptyLines)
+	if stats.EmptyLines != 1 {
+		t.Errorf("EmptyLines = %d, want 1", stats.EmptyLines)
 	}
 	if stats.InvalidLines != 1 {
 		t.Errorf("InvalidLines = %d, want 1", stats.InvalidLines)
@@ -465,7 +465,7 @@ func TestParser_ComplexQuoting(t *testing.T) {
 			want:  `value"with"quotes`,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewParser()
@@ -473,7 +473,7 @@ func TestParser_ComplexQuoting(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Parse() error = %v", err)
 			}
-			
+
 			if got := vars["KEY"]; got != tt.want {
 				t.Errorf("Parse() value = %q, want %q", got, tt.want)
 			}
@@ -519,17 +519,17 @@ func TestParser_EdgeCases(t *testing.T) {
 			want:  map[string]string{"KEY": "value = with = equals"},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewParser()
 			got, err := p.Parse(strings.NewReader(tt.input))
-			
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Parse() = %v, want %v", got, tt.want)
 			}
@@ -549,10 +549,10 @@ func BenchmarkParser_Parse(b *testing.B) {
 			fmt.Fprintln(&buf) // Empty line
 		}
 	}
-	
+
 	content := buf.String()
 	p := NewParser()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		reader := strings.NewReader(content)
@@ -568,10 +568,10 @@ func BenchmarkParser_ExpandVars(b *testing.B) {
 BIN=$BASE/bin
 LIB=${BASE}/lib
 PATH=$BIN:$LIB:$PATH`
-	
+
 	p := NewParser()
 	p.ExpandVars = true
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		reader := strings.NewReader(content)

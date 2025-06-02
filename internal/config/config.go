@@ -12,17 +12,17 @@ import (
 
 // Config represents the complete vaultenv configuration
 type Config struct {
-	Version      string                        `yaml:"version"`
-	Project      ProjectConfig                 `yaml:"project"`
+	Version      string                       `yaml:"version"`
+	Project      ProjectConfig                `yaml:"project"`
 	Environments map[string]EnvironmentConfig `yaml:"environments,omitempty"`
-	Vault        VaultConfig                   `yaml:"vault"`
-	Security     SecurityConfig                `yaml:"security"`
-	Sync         SyncConfig                    `yaml:"sync"`
-	Git          GitConfig                     `yaml:"git"`
-	Import       ImportConfig                  `yaml:"import"`
-	Export       ExportConfig                  `yaml:"export"`
-	UI           UIConfig                      `yaml:"ui"`
-	Plugins      []PluginConfig                `yaml:"plugins,omitempty"`
+	Vault        VaultConfig                  `yaml:"vault"`
+	Security     SecurityConfig               `yaml:"security"`
+	Sync         SyncConfig                   `yaml:"sync"`
+	Git          GitConfig                    `yaml:"git"`
+	Import       ImportConfig                 `yaml:"import"`
+	Export       ExportConfig                 `yaml:"export"`
+	UI           UIConfig                     `yaml:"ui"`
+	Plugins      []PluginConfig               `yaml:"plugins,omitempty"`
 }
 
 // ProjectConfig holds project-specific settings
@@ -59,15 +59,15 @@ type KDFConfig struct {
 
 // SecurityConfig contains security-related settings
 type SecurityConfig struct {
-	RequireMFA               bool       `yaml:"require_mfa"`
-	AllowedIPs               []string   `yaml:"allowed_ips,omitempty"`
-	SessionTimeout           string     `yaml:"session_timeout"`
-	MaxLoginAttempts         int        `yaml:"max_login_attempts"`
-	PasswordPolicy           PassPolicy `yaml:"password_policy"`
-	AuditLog                 bool       `yaml:"audit_log"`
-	SecureDelete             bool       `yaml:"secure_delete"`
-	MemoryProtection         bool       `yaml:"memory_protection"`
-	PerEnvironmentPasswords  bool       `yaml:"per_environment_passwords"`
+	RequireMFA              bool       `yaml:"require_mfa"`
+	AllowedIPs              []string   `yaml:"allowed_ips,omitempty"`
+	SessionTimeout          string     `yaml:"session_timeout"`
+	MaxLoginAttempts        int        `yaml:"max_login_attempts"`
+	PasswordPolicy          PassPolicy `yaml:"password_policy"`
+	AuditLog                bool       `yaml:"audit_log"`
+	SecureDelete            bool       `yaml:"secure_delete"`
+	MemoryProtection        bool       `yaml:"memory_protection"`
+	PerEnvironmentPasswords bool       `yaml:"per_environment_passwords"`
 }
 
 // PassPolicy defines password requirements
@@ -107,16 +107,16 @@ type SyncConfig struct {
 
 // GitConfig defines Git integration settings
 type GitConfig struct {
-	Enabled            bool     `yaml:"enabled"`
-	AutoCommit         bool     `yaml:"auto_commit"`
-	AutoPush           bool     `yaml:"auto_push"`
-	CommitMessage      string   `yaml:"commit_message,omitempty"`
-	CommitTemplate     string   `yaml:"commit_template,omitempty"`
-	ConflictStrategy   string   `yaml:"conflict_strategy,omitempty"` // "prompt", "ours", "theirs", "newest"
-	EncryptionMode     string   `yaml:"encryption_mode"`             // "deterministic" or "random"
-	DeterministicMode  bool     `yaml:"deterministic_mode"`          // Use deterministic encryption for git (deprecated, use EncryptionMode)
-	IgnorePatterns     []string `yaml:"ignore_patterns,omitempty"`
-	Hooks              GitHooks `yaml:"hooks,omitempty"`
+	Enabled           bool     `yaml:"enabled"`
+	AutoCommit        bool     `yaml:"auto_commit"`
+	AutoPush          bool     `yaml:"auto_push"`
+	CommitMessage     string   `yaml:"commit_message,omitempty"`
+	CommitTemplate    string   `yaml:"commit_template,omitempty"`
+	ConflictStrategy  string   `yaml:"conflict_strategy,omitempty"` // "prompt", "ours", "theirs", "newest"
+	EncryptionMode    string   `yaml:"encryption_mode"`             // "deterministic" or "random"
+	DeterministicMode bool     `yaml:"deterministic_mode"`          // Use deterministic encryption for git (deprecated, use EncryptionMode)
+	IgnorePatterns    []string `yaml:"ignore_patterns,omitempty"`
+	Hooks             GitHooks `yaml:"hooks,omitempty"`
 }
 
 // GitHooks defines Git hook configurations
@@ -151,14 +151,14 @@ type ExportConfig struct {
 
 // UIConfig contains UI/UX preferences
 type UIConfig struct {
-	Theme           string `yaml:"theme"` // "dark", "light", "auto"
-	Color           bool   `yaml:"color"`
-	Emoji           bool   `yaml:"emoji"`
-	ProgressBar     bool   `yaml:"progress_bar"`
-	Notifications   bool   `yaml:"notifications"`
-	DateFormat      string `yaml:"date_format,omitempty"`
-	TimeFormat      string `yaml:"time_format,omitempty"`
-	Language        string `yaml:"language,omitempty"`
+	Theme         string `yaml:"theme"` // "dark", "light", "auto"
+	Color         bool   `yaml:"color"`
+	Emoji         bool   `yaml:"emoji"`
+	ProgressBar   bool   `yaml:"progress_bar"`
+	Notifications bool   `yaml:"notifications"`
+	DateFormat    string `yaml:"date_format,omitempty"`
+	TimeFormat    string `yaml:"time_format,omitempty"`
+	Language      string `yaml:"language,omitempty"`
 }
 
 // PluginConfig represents a plugin configuration
@@ -214,7 +214,7 @@ func DefaultConfig() *Config {
 		},
 		Environments: map[string]EnvironmentConfig{
 			"development": {
-				Description: "Development environment",
+				Description:       "Development environment",
 				PasswordProtected: true,
 				PasswordPolicy: PassPolicy{
 					MinLength:      8,
@@ -225,7 +225,7 @@ func DefaultConfig() *Config {
 				Notifications: true,
 			},
 			"staging": {
-				Description: "Staging environment",
+				Description:       "Staging environment",
 				PasswordProtected: true,
 				PasswordPolicy: PassPolicy{
 					MinLength:      12,
@@ -238,7 +238,7 @@ func DefaultConfig() *Config {
 				Notifications:   true,
 			},
 			"production": {
-				Description: "Production environment",
+				Description:       "Production environment",
 				PasswordProtected: true,
 				PasswordPolicy: PassPolicy{
 					MinLength:      16,
@@ -264,12 +264,12 @@ func DefaultConfig() *Config {
 			RetryDelay:    5 * time.Second,
 		},
 		Git: GitConfig{
-			Enabled:       true,
-			AutoCommit:    false,
-			AutoPush:      false,
-			CommitMessage: "Update vault configuration",
+			Enabled:          true,
+			AutoCommit:       false,
+			AutoPush:         false,
+			CommitMessage:    "Update vault configuration",
 			ConflictStrategy: "prompt",
-			EncryptionMode: "random",
+			EncryptionMode:   "random",
 			IgnorePatterns: []string{
 				"*.key",
 				"*.pem",
@@ -335,7 +335,7 @@ func LoadFromFile(path string) (*Config, error) {
 // LoadFromReader reads configuration from an io.Reader
 func LoadFromReader(r io.Reader) (*Config, error) {
 	config := DefaultConfig()
-	
+
 	decoder := yaml.NewDecoder(r)
 	if err := decoder.Decode(config); err != nil {
 		return nil, fmt.Errorf("failed to decode config: %w", err)
@@ -414,7 +414,7 @@ func (c *Config) Validate() error {
 
 	// Validate encryption algorithm
 	validAlgos := map[string]bool{
-		"aes-256-gcm": true,
+		"aes-256-gcm":       true,
 		"chacha20-poly1305": true,
 	}
 	if !validAlgos[c.Vault.EncryptionAlgo] {
@@ -529,7 +529,7 @@ func (c *Config) GetVaultPath() string {
 	if configDir == "" || configDir == "." {
 		configDir = ".vaultenv"
 	}
-	
+
 	return filepath.Join(configDir, filepath.Base(c.Vault.Path))
 }
 
@@ -585,7 +585,7 @@ func (c *Config) GetPasswordPolicy(environment string) PassPolicy {
 			return envConfig.PasswordPolicy
 		}
 	}
-	
+
 	// Fall back to global policy
 	return c.Security.PasswordPolicy
 }

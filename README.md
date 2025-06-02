@@ -1,10 +1,13 @@
-# vaultenv-cli - Secure Environment Variable Management 🔐
+# VaultEnv CLI - Secure Environment Variable Management 🔐
 
-[![CI Status](https://github.com/vaultenv/vaultenv-cli/workflows/CI/badge.svg)](https://github.com/vaultenv/vaultenv-cli/actions)
-[![Go Report Card](https://goreportcard.com/badge/github.com/vaultenv/vaultenv-cli)](https://goreportcard.com/report/github.com/vaultenv/vaultenv-cli)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Beta Version](https://img.shields.io/badge/version-v0.1.0--beta.1-orange)](https://github.com/vaultenv/vaultenv-cli/releases)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/vaultenv/vaultenv-cli)](https://go.dev)
+[![Test Coverage](https://img.shields.io/badge/coverage-56.5%25-yellow)](./coverage.out)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-vaultenv-cli makes managing environment variables across different environments as simple as a single command, while maintaining bank-level security.
+> ⚠️ **Beta Release**: This is a beta version. While core features are stable, some functionality may change before the 1.0 release.
+
+VaultEnv CLI is a secure, developer-friendly command-line tool for managing environment variables across different environments. Built with zero-knowledge encryption, it ensures your secrets remain secure while providing a seamless development experience.
 
 ## 🚀 Quick Start
 
@@ -40,11 +43,16 @@ vaultenv-cli list
 vaultenv-cli set API_KEY=prod-key --env production
 ```
 
-## 🔐 Security First
+## ✨ Key Features
 
-- **Zero-Knowledge Architecture**: Your secrets are encrypted client-side. We can't read them even if we wanted to.
-- **OS Keychain Integration**: Encryption keys are stored in your system's secure keystore.
-- **Open Source**: All security-critical code is open source and auditable.
+- **🔐 Zero-Knowledge Encryption**: Client-side AES-256-GCM encryption with Argon2id key derivation
+- **🔑 Per-Environment Passwords**: Separate encryption keys for each environment
+- **📁 Multiple Storage Backends**: File, SQLite, and Git-friendly storage options
+- **🔄 Git Integration**: Deterministic encryption mode for clean diffs
+- **📋 Import/Export**: Support for .env, JSON, YAML, and Docker formats
+- **🔍 Audit Trail**: Complete history tracking with SQLite backend
+- **🔒 OS Keychain Integration**: Secure key storage using system keychains
+- **🎯 Developer Friendly**: Intuitive commands and helpful error messages
 
 ## 🛠️ Development
 
@@ -60,17 +68,18 @@ vaultenv-cli set API_KEY=prod-key --env production
 git clone https://github.com/vaultenv/vaultenv-cli.git
 cd vaultenv-cli
 
-# Install development tools
-make setup
-
 # Build the binary
-make build
+go build -o vaultenv ./cmd/vaultenv-cli
 
 # Run tests
-make test
+go test ./...
 
-# Run linters
-make lint
+# Run tests with coverage
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+
+# Install locally
+go install ./cmd/vaultenv-cli
 ```
 
 ### Project Structure
@@ -79,16 +88,21 @@ make lint
 vaultenv-cli/
 ├── cmd/vaultenv-cli/    # Application entry point
 ├── internal/            # Private application code
+│   ├── auth/           # Password management and authentication
 │   ├── cmd/            # Command implementations
 │   ├── config/         # Configuration management
+│   ├── keystore/       # Encryption key storage
 │   ├── ui/             # Terminal UI components
-│   └── errors/         # Error handling
+│   └── test/           # Test helpers
 ├── pkg/                # Public packages
+│   ├── access/         # Access control
+│   ├── dotenv/         # .env file parsing
 │   ├── encryption/     # Encryption implementations
-│   ├── storage/        # Storage backends
-│   └── types/          # Shared types
-├── scripts/            # Build and dev scripts
-└── docs/              # Documentation
+│   ├── export/         # Export format handlers
+│   ├── keystore/       # OS keychain integration
+│   └── storage/        # Storage backends
+├── docs/               # Documentation
+└── scripts/            # Build and test scripts
 ```
 
 ## 🤝 Contributing

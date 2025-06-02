@@ -73,7 +73,7 @@ func TestMigrateConfig(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := MigrateConfig(tt.input)
@@ -81,7 +81,7 @@ func TestMigrateConfig(t *testing.T) {
 				t.Errorf("MigrateConfig() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if err == nil && got != nil {
 				// Verify migration sets current version
 				if got.Version != CurrentVersion {
@@ -107,15 +107,15 @@ func TestMigrateV1ToV2(t *testing.T) {
 				if len(cfg.Environments) < 2 {
 					return fmt.Errorf("expected at least 2 default environments, got %d", len(cfg.Environments))
 				}
-				
+
 				if _, exists := cfg.Environments["development"]; !exists {
 					return fmt.Errorf("missing development environment")
 				}
-				
+
 				if _, exists := cfg.Environments["production"]; !exists {
 					return fmt.Errorf("missing production environment")
 				}
-				
+
 				return nil
 			},
 		},
@@ -136,15 +136,15 @@ func TestMigrateV1ToV2(t *testing.T) {
 			},
 			check: func(cfg *Config) error {
 				testEnv := cfg.Environments["test"]
-				
+
 				if !testEnv.PasswordProtected {
 					return fmt.Errorf("test environment should have password protection enabled")
 				}
-				
+
 				if testEnv.PasswordPolicy.MinLength != 15 {
 					return fmt.Errorf("test environment should use global policy, got MinLength=%d", testEnv.PasswordPolicy.MinLength)
 				}
-				
+
 				return nil
 			},
 		},
@@ -167,7 +167,7 @@ func TestMigrateV1ToV2(t *testing.T) {
 				if devPolicy.RequireUpper {
 					return fmt.Errorf("development should not require uppercase")
 				}
-				
+
 				// Check staging policy
 				stagingPolicy := cfg.Environments["staging"].PasswordPolicy
 				if stagingPolicy.MinLength != 12 {
@@ -176,7 +176,7 @@ func TestMigrateV1ToV2(t *testing.T) {
 				if !stagingPolicy.RequireNumbers {
 					return fmt.Errorf("staging should require numbers")
 				}
-				
+
 				// Check production policy
 				prodPolicy := cfg.Environments["production"].PasswordPolicy
 				if prodPolicy.MinLength != 16 {
@@ -188,20 +188,20 @@ func TestMigrateV1ToV2(t *testing.T) {
 				if prodPolicy.ExpiryDays != 90 {
 					return fmt.Errorf("production ExpiryDays = %d, want 90", prodPolicy.ExpiryDays)
 				}
-				
+
 				return nil
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := migrateV1ToV2(tt.input)
-			
+
 			if result.Version != "2.0.0" {
 				t.Errorf("Version = %v, want 2.0.0", result.Version)
 			}
-			
+
 			if err := tt.check(result); err != nil {
 				t.Error(err)
 			}
@@ -231,7 +231,7 @@ func TestMigrateV2ToV3(t *testing.T) {
 				if !cfg.Import.AutoBackup {
 					return fmt.Errorf("Import.AutoBackup should be true")
 				}
-				
+
 				// Check Export defaults
 				if cfg.Export.DefaultFormat != "dotenv" {
 					return fmt.Errorf("Export.DefaultFormat = %v, want 'dotenv'", cfg.Export.DefaultFormat)
@@ -239,7 +239,7 @@ func TestMigrateV2ToV3(t *testing.T) {
 				if cfg.Export.Templates == nil {
 					return fmt.Errorf("Export.Templates should be initialized")
 				}
-				
+
 				return nil
 			},
 		},
@@ -292,7 +292,7 @@ func TestMigrateV2ToV3(t *testing.T) {
 				Version: "2.0.0",
 				Import: ImportConfig{
 					DefaultParser: ParserConfig{
-						TrimSpace: false,
+						TrimSpace:  false,
 						ExpandVars: true,
 					},
 					AutoBackup: false,
@@ -302,7 +302,7 @@ func TestMigrateV2ToV3(t *testing.T) {
 				},
 				Git: GitConfig{
 					ConflictStrategy: "ours",
-					EncryptionMode: "custom",
+					EncryptionMode:   "custom",
 				},
 			},
 			check: func(cfg *Config) error {
@@ -323,15 +323,15 @@ func TestMigrateV2ToV3(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := migrateV2ToV3(tt.input)
-			
+
 			if result.Version != "3.0.0" {
 				t.Errorf("Version = %v, want 3.0.0", result.Version)
 			}
-			
+
 			if err := tt.check(result); err != nil {
 				t.Error(err)
 			}
@@ -353,7 +353,7 @@ func TestIsLegacyConfig(t *testing.T) {
 		{"v3.0.0", "3.0.0", false},
 		{"future", "4.0.0", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{Version: tt.version}
@@ -376,7 +376,7 @@ func TestNeedsMigration(t *testing.T) {
 		{"current", CurrentVersion, false},
 		{"future", "99.0.0", true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{Version: tt.version}
@@ -408,40 +408,40 @@ func TestMigrationChain(t *testing.T) {
 			DeterministicMode: true,
 		},
 	}
-	
+
 	migrated, err := MigrateConfig(v1Config)
 	if err != nil {
 		t.Fatalf("MigrateConfig() error = %v", err)
 	}
-	
+
 	// Verify final state
 	if migrated.Version != CurrentVersion {
 		t.Errorf("Final version = %v, want %v", migrated.Version, CurrentVersion)
 	}
-	
+
 	// Verify v1->v2 migration happened
 	if len(migrated.Environments) == 0 {
 		t.Error("Environments should be created during v1->v2 migration")
 	}
-	
+
 	// Verify v2->v3 migration happened
 	if migrated.Import.DefaultParser.TrimSpace != true {
 		t.Error("Import config should be set during v2->v3 migration")
 	}
-	
+
 	if migrated.Export.DefaultFormat != "dotenv" {
 		t.Error("Export config should be set during v2->v3 migration")
 	}
-	
+
 	if migrated.Git.EncryptionMode != "deterministic" {
 		t.Error("Git.EncryptionMode should be migrated from DeterministicMode")
 	}
-	
+
 	// Verify original fields preserved
 	if migrated.Project.Name != "migration-test" {
 		t.Errorf("Project.Name = %v, want 'migration-test'", migrated.Project.Name)
 	}
-	
+
 	if migrated.Vault.Path != ".vault" {
 		t.Errorf("Vault.Path = %v, want '.vault'", migrated.Vault.Path)
 	}
@@ -460,23 +460,23 @@ func TestMigrationIdempotency(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// First migration
 	first, err := MigrateConfig(original)
 	if err != nil {
 		t.Fatalf("First migration error = %v", err)
 	}
-	
+
 	// Second migration (should be no-op)
 	second, err := MigrateConfig(first)
 	if err != nil {
 		t.Fatalf("Second migration error = %v", err)
 	}
-	
+
 	// Compare results (excluding version which gets updated)
 	first.Version = ""
 	second.Version = ""
-	
+
 	if !reflect.DeepEqual(first, second) {
 		t.Error("Multiple migrations produced different results")
 	}
@@ -493,7 +493,7 @@ func BenchmarkMigrateConfig(b *testing.B) {
 			"prod": {},
 		},
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Make a copy to avoid modifying the original

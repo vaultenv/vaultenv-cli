@@ -31,7 +31,7 @@ func (pmm *PasswordMigrationManager) MigrateToPerEnvironmentPasswords(projectCon
 		ui.Info("This project uses a single password for all environments.")
 		ui.Info("VaultEnv now supports per-environment passwords for better security.")
 		ui.Info("This allows different team members to have access to different environments.")
-		
+
 		if promptConfirm("Would you like to migrate to per-environment passwords?") {
 			return pmm.performPasswordMigration(projectConfig)
 		} else {
@@ -39,7 +39,7 @@ func (pmm *PasswordMigrationManager) MigrateToPerEnvironmentPasswords(projectCon
 			return nil
 		}
 	}
-	
+
 	return nil
 }
 
@@ -48,7 +48,7 @@ func (pmm *PasswordMigrationManager) ForceMigration(projectConfig *config.Config
 	if !pmm.isLegacyProject(projectConfig) {
 		return fmt.Errorf("project is already using per-environment passwords")
 	}
-	
+
 	return pmm.performPasswordMigration(projectConfig)
 }
 
@@ -58,16 +58,16 @@ func (pmm *PasswordMigrationManager) isLegacyProject(cfg *config.Config) bool {
 	if cfg.Version < "2.0.0" {
 		return true
 	}
-	
+
 	// If per_environment_passwords is explicitly set to false, it's legacy
 	if !cfg.Security.PerEnvironmentPasswords {
 		return true
 	}
-	
+
 	// Check if we have any project-level keys (old format) but no environment-level keys
 	hasProjectKey := pmm.hasProjectLevelKey(cfg.Project.ID)
 	hasEnvironmentKeys := pmm.hasEnvironmentKeys(cfg.Project.ID)
-	
+
 	return hasProjectKey && !hasEnvironmentKeys
 }
 
@@ -86,13 +86,13 @@ func (pmm *PasswordMigrationManager) hasEnvironmentKeys(projectID string) bool {
 // performPasswordMigration executes the migration process
 func (pmm *PasswordMigrationManager) performPasswordMigration(cfg *config.Config) error {
 	ui.Info("Migrating to per-environment passwords...")
-	
+
 	// Get the existing project key
 	projectKey, err := pmm.keystore.GetKey(cfg.Project.ID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve existing project key: %w", err)
 	}
-	
+
 	// Get list of environments from config
 	environments := cfg.GetEnvironmentNames()
 	if len(environments) == 0 {
@@ -100,9 +100,9 @@ func (pmm *PasswordMigrationManager) performPasswordMigration(cfg *config.Config
 		environments = []string{"development", "staging", "production"}
 		ui.Warning("No environments found in config, using defaults: %v", environments)
 	}
-	
+
 	ui.Info("Creating environment-specific keys for: %v", environments)
-	
+
 	// For each environment, create an environment-specific key with the same settings
 	for _, env := range environments {
 		envKey := &keystore.EnvironmentKeyEntry{
@@ -117,40 +117,40 @@ func (pmm *PasswordMigrationManager) performPasswordMigration(cfg *config.Config
 			Memory:           64 * 1024,  // Default memory (64MB)
 			Parallelism:      4,          // Default parallelism
 		}
-		
+
 		if err := pmm.keystore.StoreEnvironmentKey(cfg.Project.ID, env, envKey); err != nil {
 			return fmt.Errorf("failed to create key for environment %s: %w", env, err)
 		}
 	}
-	
+
 	// Update config to enable per-environment passwords
 	cfg.Version = "2.0.0"
 	cfg.Security.PerEnvironmentPasswords = true
-	
+
 	// Save updated config
 	if err := cfg.Save(); err != nil {
 		return fmt.Errorf("failed to save updated config: %w", err)
 	}
 	ui.Success("Successfully migrated to per-environment passwords!")
 	ui.Info("Each environment now has its own password:")
-	
+
 	for _, env := range environments {
 		ui.Info("  - %s: Uses the same password as before", env)
 	}
-	
+
 	ui.Info("You can now change individual environment passwords using:")
 	ui.Info("  vaultenv env change-password <environment>")
-	
+
 	return nil
 }
 
 // MigrationStatus provides information about migration status
 type MigrationStatus struct {
-	IsLegacy            bool
-	HasProjectKey       bool
-	HasEnvironmentKeys  bool
-	Environments        []string
-	RequiresMigration   bool
+	IsLegacy           bool
+	HasProjectKey      bool
+	HasEnvironmentKeys bool
+	Environments       []string
+	RequiresMigration  bool
 }
 
 // GetMigrationStatus returns the current migration status
@@ -158,12 +158,12 @@ func (pmm *PasswordMigrationManager) GetMigrationStatus(cfg *config.Config) (*Mi
 	hasProjectKey := pmm.hasProjectLevelKey(cfg.Project.ID)
 	hasEnvironmentKeys := pmm.hasEnvironmentKeys(cfg.Project.ID)
 	isLegacy := pmm.isLegacyProject(cfg)
-	
+
 	environments, err := pmm.keystore.ListEnvironments(cfg.Project.ID)
 	if err != nil {
 		environments = []string{}
 	}
-	
+
 	status := &MigrationStatus{
 		IsLegacy:           isLegacy,
 		HasProjectKey:      hasProjectKey,
@@ -171,7 +171,7 @@ func (pmm *PasswordMigrationManager) GetMigrationStatus(cfg *config.Config) (*Mi
 		Environments:       environments,
 		RequiresMigration:  isLegacy && hasProjectKey && !hasEnvironmentKeys,
 	}
-	
+
 	return status, nil
 }
 
@@ -182,16 +182,16 @@ func (pmm *PasswordMigrationManager) CleanupLegacyKeys(projectID string) error {
 	if err != nil || len(environments) == 0 {
 		return fmt.Errorf("cannot cleanup: no environment keys found")
 	}
-	
+
 	ui.Info("Cleaning up legacy project-level key...")
-	
+
 	if err := pmm.keystore.DeleteKey(projectID); err != nil {
 		// Don't fail if key doesn't exist
 		if err != keystore.ErrKeyNotFound {
 			return fmt.Errorf("failed to cleanup legacy key: %w", err)
 		}
 	}
-	
+
 	ui.Success("Legacy project key removed successfully")
 	return nil
 }
@@ -202,15 +202,15 @@ func (pmm *PasswordMigrationManager) ValidateMigration(cfg *config.Config) error
 	if err != nil {
 		return fmt.Errorf("failed to get migration status: %w", err)
 	}
-	
+
 	if status.RequiresMigration {
 		return fmt.Errorf("migration validation failed: project still requires migration")
 	}
-	
+
 	if !status.HasEnvironmentKeys {
 		return fmt.Errorf("migration validation failed: no environment keys found")
 	}
-	
+
 	// Verify each environment has a valid key
 	environments := cfg.GetEnvironmentNames()
 	for _, env := range environments {
@@ -219,7 +219,7 @@ func (pmm *PasswordMigrationManager) ValidateMigration(cfg *config.Config) error
 			return fmt.Errorf("migration validation failed: no key found for environment %s", env)
 		}
 	}
-	
+
 	ui.Success("Migration validation passed: all environments have valid keys")
 	return nil
 }
@@ -227,13 +227,13 @@ func (pmm *PasswordMigrationManager) ValidateMigration(cfg *config.Config) error
 // promptConfirm prompts the user for a yes/no confirmation
 func promptConfirm(message string) bool {
 	fmt.Printf("%s (y/N): ", message)
-	
+
 	reader := bufio.NewReader(os.Stdin)
 	response, err := reader.ReadString('\n')
 	if err != nil {
 		return false
 	}
-	
+
 	response = strings.TrimSpace(strings.ToLower(response))
 	return response == "y" || response == "yes"
 }

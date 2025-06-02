@@ -21,10 +21,10 @@ type Exporter interface {
 
 // ExporterOptions contains common options for all exporters
 type ExporterOptions struct {
-	SortKeys      bool // Sort keys alphabetically
-	IncludeEmpty  bool // Include empty values
-	ShowComments  bool // Include comments where supported
-	TemplateData  map[string]interface{} // Additional template data
+	SortKeys     bool                   // Sort keys alphabetically
+	IncludeEmpty bool                   // Include empty values
+	ShowComments bool                   // Include comments where supported
+	TemplateData map[string]interface{} // Additional template data
 }
 
 // DotEnvExporter exports in standard .env format
@@ -133,13 +133,13 @@ func (j *JSONExporter) Export(vars map[string]string, w io.Writer) error {
 			Key   string `json:"key"`
 			Value string `json:"value"`
 		}
-		
+
 		keys := getSortedKeys(vars, true)
 		kvPairs := make([]kv, len(keys))
 		for i, key := range keys {
 			kvPairs[i] = kv{Key: key, Value: vars[key]}
 		}
-		
+
 		// For sorted output, we need to use a different structure
 		// Let's just encode the map directly as JSON handles key sorting
 		return encoder.Encode(vars)
@@ -200,7 +200,7 @@ func (y *YAMLExporter) ContentType() string {
 // ShellExporter exports as shell script
 type ShellExporter struct {
 	Options    ExporterOptions
-	ExportVars bool // Make variables available to child processes
+	ExportVars bool   // Make variables available to child processes
 	SetCommand string // Command to use (export, set, etc.)
 }
 
@@ -239,7 +239,7 @@ func (s *ShellExporter) Export(vars map[string]string, w io.Writer) error {
 		value := vars[key]
 		// Properly escape for shell
 		escaped := shellEscape(value)
-		
+
 		if s.ExportVars {
 			fmt.Fprintf(w, "%s %s=%s\n", s.SetCommand, key, escaped)
 		} else {
@@ -424,7 +424,7 @@ func shellEscape(value string) string {
 	if !strings.Contains(value, "'") {
 		return "'" + value + "'"
 	}
-	
+
 	// Complex escaping for values containing single quotes
 	escaped := strings.ReplaceAll(value, "'", "'\"'\"'")
 	return "'" + escaped + "'"

@@ -355,7 +355,7 @@ func TestSetCommandValidation(t *testing.T) {
 					}
 
 					key := args[0]
-					
+
 					// Validation
 					if key == "" {
 						return fmt.Errorf("required flag(s) \"empty key\" not set")

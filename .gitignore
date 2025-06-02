@@ -1,0 +1,119 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage/
+coverage.out
+coverage.html
+coverage.tmp
+shell_coverage.out
+shell_coverage_full.out
+
+# Build directories
+build/
+dist/
+bin/
+release/
+
+# Compiled binaries (project specific)
+vaultenv
+vaultenv-cli
+main
+
+# Go workspace file
+go.work
+go.work.sum
+
+# Dependency directories (remove if using go modules)
+vendor/
+
+# IDE specific files
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+*.iml
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment files (local dev)
+.env
+.env.local
+.env.*.local
+
+# VaultEnv specific test data (but not the default location)
+.vaultenv.test/
+.vaultenv.bak/
+*.vault.test
+
+# Debug files
+debug
+__debug_bin*
+
+# GoReleaser temp files
+dist/
+.goreleaser.yaml.bak
+
+# Temporary files
+*.tmp
+*.log
+*.pid
+tmp/
+temp/
+
+# Local configuration
+local.yaml
+local.yml
+config.local.yaml
+config.local.yml
+
+# Private keys and certificates (never commit these)
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Generated documentation (if any)
+/site/
+
+# Test databases
+*.db
+*.sqlite
+*.sqlite3
+test*.db
+
+# Benchmarking
+*.bench
+
+# Profiling
+*.prof
+*.pprof
+
+# Archives (usually build artifacts)
+*.tar.gz
+*.tgz
+*.zip
+*.tar
+*.gz
+
+# But allow these specific files
+!install.sh
+!scripts/*.sh

@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/spf13/cobra"
 
 	"github.com/vaultenv/vaultenv-cli/internal/config"
 	"github.com/vaultenv/vaultenv-cli/internal/ui"
-	"github.com/vaultenv/vaultenv-cli/pkg/export"
 	"github.com/vaultenv/vaultenv-cli/pkg/dotenv"
+	"github.com/vaultenv/vaultenv-cli/pkg/export"
 )
 
 // newBatchCommand creates the batch command for bulk operations
@@ -48,13 +48,13 @@ environments, export all environments at once, or perform bulk imports.`,
 // newBatchExportCommand creates the batch export-all command
 func newBatchExportCommand() *cobra.Command {
 	var (
-		toDir       string
-		format      string
-		timestamp   bool
-		envs        []string
+		toDir        string
+		format       string
+		timestamp    bool
+		envs         []string
 		includeEmpty bool
-		overwrite   bool
-		dryRun      bool
+		overwrite    bool
+		dryRun       bool
 	)
 
 	cmd := &cobra.Command{
@@ -101,7 +101,7 @@ The export format and various options can be customized.`,
 }
 
 // runBatchExport executes the batch export command
-func runBatchExport(cmd *cobra.Command, toDir, format string, timestamp bool, 
+func runBatchExport(cmd *cobra.Command, toDir, format string, timestamp bool,
 	envs []string, includeEmpty, overwrite, dryRun bool) error {
 
 	// Get configuration
@@ -144,7 +144,7 @@ func runBatchExport(cmd *cobra.Command, toDir, format string, timestamp bool,
 	var errors []error
 
 	for _, env := range envs {
-		if err := exportSingleEnvironment(cfg, env, toDir, format, timestamp, 
+		if err := exportSingleEnvironment(cfg, env, toDir, format, timestamp,
 			includeEmpty, overwrite, dryRun, factory); err != nil {
 			errors = append(errors, fmt.Errorf("%s: %w", env, err))
 			ui.Error("Failed to export %s: %v", env, err)
@@ -173,7 +173,7 @@ func runBatchExport(cmd *cobra.Command, toDir, format string, timestamp bool,
 }
 
 // exportSingleEnvironment exports a single environment to a file
-func exportSingleEnvironment(cfg *config.Config, env, toDir, format string, 
+func exportSingleEnvironment(cfg *config.Config, env, toDir, format string,
 	timestamp, includeEmpty, overwrite, dryRun bool, factory *export.ExporterFactory) error {
 
 	// Get storage for the environment
@@ -240,13 +240,13 @@ func exportSingleEnvironment(cfg *config.Config, env, toDir, format string,
 // newBatchImportCommand creates the batch import-all command
 func newBatchImportCommand() *cobra.Command {
 	var (
-		fromDir      string
-		pattern      string
-		toEnv        string
-		createEnvs   bool
-		noOverride   bool
-		dryRun       bool
-		expandVars   bool
+		fromDir       string
+		pattern       string
+		toEnv         string
+		createEnvs    bool
+		noOverride    bool
+		dryRun        bool
+		expandVars    bool
 		ignoreInvalid bool
 	)
 
@@ -296,7 +296,7 @@ New environments can be created automatically if they don't exist.`,
 }
 
 // runBatchImport executes the batch import command
-func runBatchImport(cmd *cobra.Command, fromDir, pattern, toEnv string, 
+func runBatchImport(cmd *cobra.Command, fromDir, pattern, toEnv string,
 	createEnvs, noOverride, dryRun, expandVars, ignoreInvalid bool) error {
 
 	// Get configuration
@@ -329,7 +329,7 @@ func runBatchImport(cmd *cobra.Command, fromDir, pattern, toEnv string,
 			env = deriveEnvironmentName(file)
 		}
 
-		if err := importSingleFile(cfg, file, env, createEnvs, noOverride, 
+		if err := importSingleFile(cfg, file, env, createEnvs, noOverride,
 			dryRun, expandVars, ignoreInvalid); err != nil {
 			errors = append(errors, fmt.Errorf("%s: %w", filepath.Base(file), err))
 			ui.Error("Failed to import %s: %v", filepath.Base(file), err)
@@ -358,7 +358,7 @@ func runBatchImport(cmd *cobra.Command, fromDir, pattern, toEnv string,
 }
 
 // importSingleFile imports a single .env file
-func importSingleFile(cfg *config.Config, filename, env string, createEnvs, noOverride, 
+func importSingleFile(cfg *config.Config, filename, env string, createEnvs, noOverride,
 	dryRun, expandVars, ignoreInvalid bool) error {
 
 	// Check if environment exists
@@ -430,7 +430,7 @@ func findMatchingFiles(dir, pattern string) ([]string, error) {
 // deriveEnvironmentName derives an environment name from a filename
 func deriveEnvironmentName(filename string) string {
 	base := filepath.Base(filename)
-	
+
 	// Remove common extensions
 	extensions := []string{".env", ".config", ".txt"}
 	for _, ext := range extensions {
@@ -439,22 +439,22 @@ func deriveEnvironmentName(filename string) string {
 			break
 		}
 	}
-	
+
 	// Handle common patterns
 	if base == ".env" {
 		return "development"
 	}
-	
+
 	// Remove .env prefix if present (e.g., .env.production -> production)
 	if strings.HasPrefix(base, ".env.") {
 		return strings.TrimPrefix(base, ".env.")
 	}
-	
+
 	// Remove env prefix if present (e.g., env.production -> production)
 	if strings.HasPrefix(base, "env.") {
 		return strings.TrimPrefix(base, "env.")
 	}
-	
+
 	return base
 }
 

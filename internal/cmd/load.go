@@ -5,8 +5,8 @@ import (
 	"os"
 	"sort"
 
-	"github.com/spf13/cobra"
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/spf13/cobra"
 
 	"github.com/vaultenv/vaultenv-cli/internal/config"
 	"github.com/vaultenv/vaultenv-cli/internal/ui"
@@ -17,14 +17,14 @@ import (
 // newLoadCommand creates the load command for importing .env files
 func newLoadCommand() *cobra.Command {
 	var (
-		fromFile     string
-		toEnv        string
-		mapping      map[string]string
-		noOverride   bool
-		interactive  bool
-		dryRun       bool
-		showStats    bool
-		expandVars   bool
+		fromFile      string
+		toEnv         string
+		mapping       map[string]string
+		noOverride    bool
+		interactive   bool
+		dryRun        bool
+		showStats     bool
+		expandVars    bool
 		ignoreInvalid bool
 	)
 
@@ -83,7 +83,7 @@ conflict resolution, variable mapping, and selective import.`,
 }
 
 // runLoad executes the load command
-func runLoad(cmd *cobra.Command, fromFile, toEnv string, mapping map[string]string, 
+func runLoad(cmd *cobra.Command, fromFile, toEnv string, mapping map[string]string,
 	noOverride, interactive, dryRun, showStats, expandVars, ignoreInvalid bool) error {
 
 	// Get configuration
@@ -242,23 +242,23 @@ func displayStats(filename string, stats dotenv.Stats) {
 	ui.Info("Variables: %d", stats.Variables)
 	ui.Info("Comments: %d", stats.Comments)
 	ui.Info("Empty lines: %d", stats.EmptyLines)
-	
+
 	if stats.InvalidLines > 0 {
 		ui.Warning("Invalid lines: %d", stats.InvalidLines)
 	}
-	
+
 	if len(stats.DuplicateKeys) > 0 {
 		ui.Warning("Duplicate keys found: %v", stats.DuplicateKeys)
 		ui.Info("Last value will be used for duplicates")
 	}
-	
+
 	ui.Info("")
 }
 
 // applyMappings applies variable name mappings
 func applyMappings(vars map[string]string, mapping map[string]string) map[string]string {
 	result := make(map[string]string)
-	
+
 	for key, value := range vars {
 		newKey := key
 		if mapped, ok := mapping[key]; ok {
@@ -266,7 +266,7 @@ func applyMappings(vars map[string]string, mapping map[string]string) map[string
 		}
 		result[newKey] = value
 	}
-	
+
 	return result
 }
 
@@ -320,7 +320,7 @@ func interactiveSelection(vars map[string]string) (map[string]string, error) {
 // checkConflicts checks which variables already exist in storage
 func checkConflicts(store storage.Backend, vars map[string]string) ([]string, error) {
 	var conflicts []string
-	
+
 	for key := range vars {
 		exists, err := store.Exists(key)
 		if err != nil {
@@ -330,7 +330,7 @@ func checkConflicts(store storage.Backend, vars map[string]string) ([]string, er
 			conflicts = append(conflicts, key)
 		}
 	}
-	
+
 	sort.Strings(conflicts)
 	return conflicts, nil
 }
@@ -341,14 +341,14 @@ func filterConflicts(vars map[string]string, conflicts []string) map[string]stri
 	for _, key := range conflicts {
 		conflictSet[key] = true
 	}
-	
+
 	result := make(map[string]string)
 	for key, value := range vars {
 		if !conflictSet[key] {
 			result[key] = value
 		}
 	}
-	
+
 	return result
 }
 
@@ -369,7 +369,7 @@ func displayImportPreview(vars map[string]string, conflicts []string) {
 	for _, key := range keys {
 		value := vars[key]
 		maskedValue := maskValue(value)
-		
+
 		if conflictSet[key] {
 			ui.Info("  🔄 %s = %s (will override)", key, maskedValue)
 		} else {
@@ -385,7 +385,7 @@ func importVariables(store storage.Backend, vars map[string]string, environment 
 	}
 
 	ui.Info("Importing %d variables...", len(vars))
-	
+
 	// Import each variable
 	imported := 0
 	for key, value := range vars {
@@ -404,17 +404,17 @@ func maskValue(value string) string {
 	if len(value) == 0 {
 		return `""`
 	}
-	
+
 	// Don't mask very short values (likely not sensitive)
 	if len(value) <= 3 {
 		return fmt.Sprintf("%q", value)
 	}
-	
+
 	// Mask middle part of longer values
 	if len(value) <= 8 {
 		return fmt.Sprintf("%s***", value[:1])
 	}
-	
+
 	return fmt.Sprintf("%s***%s", value[:3], value[len(value)-2:])
 }
 

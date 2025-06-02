@@ -33,8 +33,8 @@ func addAliases(rootCmd *cobra.Command) {
 				Run:    cmd.Run,
 				Args:   cmd.Args,
 				// Inherit all the flags from the original command
-				PreRunE:          cmd.PreRunE,
-				PostRunE:         cmd.PostRunE,
+				PreRunE:           cmd.PreRunE,
+				PostRunE:          cmd.PostRunE,
 				PersistentPreRunE: cmd.PersistentPreRunE,
 			}
 

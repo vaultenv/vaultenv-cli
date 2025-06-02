@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/spf13/cobra"
 
 	"github.com/vaultenv/vaultenv-cli/internal/ui"
 	"github.com/vaultenv/vaultenv-cli/pkg/export"
@@ -18,15 +18,15 @@ import (
 // newExportCommand creates the export command for exporting variables to files
 func newExportCommand() *cobra.Command {
 	var (
-		fromEnv     string
-		toFile      string
-		format      string
-		filter      []string
-		showValues  bool
-		template    string
-		overwrite   bool
-		dryRun      bool
-		sortKeys    bool
+		fromEnv      string
+		toFile       string
+		format       string
+		filter       []string
+		showValues   bool
+		template     string
+		overwrite    bool
+		dryRun       bool
+		sortKeys     bool
 		includeEmpty bool
 		showComments bool
 	)
@@ -62,7 +62,7 @@ output can be customized with various options.`,
   vaultenv export --to config.json --dry-run`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runExport(cmd, fromEnv, toFile, format, filter, showValues, template, 
+			return runExport(cmd, fromEnv, toFile, format, filter, showValues, template,
 				overwrite, dryRun, sortKeys, includeEmpty, showComments)
 		},
 	}
@@ -148,7 +148,7 @@ func runExport(cmd *cobra.Command, fromEnv, toFile, format string, filter []stri
 	if len(filter) > 0 {
 		vars = applyFilters(vars, filter)
 		ui.Info("Filtered to %d variables matching patterns: %v", len(vars), filter)
-		
+
 		if len(vars) == 0 {
 			ui.Warning("No variables match the specified filters")
 			return nil
@@ -168,7 +168,7 @@ func runExport(cmd *cobra.Command, fromEnv, toFile, format string, filter []stri
 		if err != nil {
 			return fmt.Errorf("failed to read template file %s: %w", template, err)
 		}
-		
+
 		exporter, err = export.NewTemplateExporter(string(templateContent), filepath.Base(template))
 		if err != nil {
 			return fmt.Errorf("failed to create template exporter: %w", err)
@@ -188,7 +188,7 @@ func runExport(cmd *cobra.Command, fromEnv, toFile, format string, filter []stri
 	// Determine output destination
 	var outputFile *os.File
 	var shouldCloseFile bool
-	
+
 	if toFile == "" {
 		// Output to stdout
 		outputFile = os.Stdout
@@ -262,7 +262,7 @@ func getAllVariables(store storage.Backend) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to list variables: %w", err)
 	}
-	
+
 	// Retrieve all values
 	result := make(map[string]string)
 	for _, key := range keys {
@@ -272,7 +272,7 @@ func getAllVariables(store storage.Backend) (map[string]string, error) {
 		}
 		result[key] = value
 	}
-	
+
 	return result, nil
 }
 
@@ -283,7 +283,7 @@ func applyFilters(vars map[string]string, patterns []string) map[string]string {
 	}
 
 	result := make(map[string]string)
-	
+
 	for key, value := range vars {
 		for _, pattern := range patterns {
 			if matchesPattern(key, pattern) {
@@ -292,7 +292,7 @@ func applyFilters(vars map[string]string, patterns []string) map[string]string {
 			}
 		}
 	}
-	
+
 	return result
 }
 
@@ -300,37 +300,37 @@ func applyFilters(vars map[string]string, patterns []string) map[string]string {
 func matchesPattern(key, pattern string) bool {
 	// Simple wildcard matching
 	// Supports * for multiple characters and ? for single character
-	
+
 	// If no wildcards, do exact match
 	if !strings.Contains(pattern, "*") && !strings.Contains(pattern, "?") {
 		return key == pattern
 	}
-	
+
 	// Convert pattern to Go regexp (simplified)
 	// * becomes .*
 	// ? becomes .
 	regexPattern := strings.ReplaceAll(pattern, "*", ".*")
 	regexPattern = strings.ReplaceAll(regexPattern, "?", ".")
 	regexPattern = "^" + regexPattern + "$"
-	
+
 	// Use simple string matching for common cases
 	if strings.HasSuffix(pattern, "*") && !strings.Contains(pattern[:len(pattern)-1], "*") {
 		prefix := pattern[:len(pattern)-1]
 		return strings.HasPrefix(key, prefix)
 	}
-	
+
 	if strings.HasPrefix(pattern, "*") && !strings.Contains(pattern[1:], "*") {
 		suffix := pattern[1:]
 		return strings.HasSuffix(key, suffix)
 	}
-	
+
 	// For complex patterns, we'd need regexp package
 	// For now, just do prefix matching for patterns ending with *
 	if strings.HasSuffix(pattern, "*") {
 		prefix := strings.TrimSuffix(pattern, "*")
 		return strings.HasPrefix(key, prefix)
 	}
-	
+
 	return key == pattern
 }
 
@@ -386,7 +386,7 @@ func configureExporter(exporter export.Exporter, sortKeys, includeEmpty, showCom
 // displayExportPreview shows what will be exported
 func displayExportPreview(vars map[string]string, format string) {
 	ui.Info("Export preview (%s format):", format)
-	
+
 	// Sort keys for consistent display
 	keys := make([]string, 0, len(vars))
 	for key := range vars {
@@ -401,7 +401,7 @@ func displayExportPreview(vars map[string]string, format string) {
 			ui.Info("  ... and %d more variables", len(keys)-maxPreview)
 			break
 		}
-		
+
 		value := vars[key]
 		maskedValue := maskValueForExport(value)
 		ui.Info("  %s = %s", key, maskedValue)

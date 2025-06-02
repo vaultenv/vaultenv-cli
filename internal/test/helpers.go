@@ -79,10 +79,10 @@ func NewTestEnvironment(t *testing.T) *TestEnvironment {
 // SetEnv sets an environment variable and schedules cleanup
 func (e *TestEnvironment) SetEnv(key, value string) {
 	e.t.Helper()
-	
+
 	oldValue, exists := os.LookupEnv(key)
 	os.Setenv(key, value)
-	
+
 	e.AddCleanup(func() {
 		if exists {
 			os.Setenv(key, oldValue)
@@ -107,10 +107,10 @@ func (e *TestEnvironment) Cleanup() {
 // WriteFile writes a file in the test environment
 func (e *TestEnvironment) WriteFile(path string, content string) {
 	e.t.Helper()
-	
+
 	fullPath := filepath.Join(e.WorkDir, path)
 	dir := filepath.Dir(fullPath)
-	
+
 	require.NoError(e.t, os.MkdirAll(dir, 0755))
 	require.NoError(e.t, os.WriteFile(fullPath, []byte(content), 0644))
 }
@@ -118,11 +118,11 @@ func (e *TestEnvironment) WriteFile(path string, content string) {
 // ReadFile reads a file from the test environment
 func (e *TestEnvironment) ReadFile(path string) string {
 	e.t.Helper()
-	
+
 	fullPath := filepath.Join(e.WorkDir, path)
 	content, err := os.ReadFile(fullPath)
 	require.NoError(e.t, err)
-	
+
 	return string(content)
 }
 
@@ -195,35 +195,35 @@ func AssertFileContains(t *testing.T, path string, expected string) {
 // MockStorage creates a pre-populated mock storage for testing
 func MockStorage() *storage.MemoryBackend {
 	backend := storage.NewMemoryBackend()
-	
+
 	// Add some test data
 	backend.Set("TEST_VAR", "test_value", false)
 	backend.Set("DATABASE_URL", "postgres://localhost/test", false)
 	backend.Set("API_KEY", "test-api-key", false)
-	
+
 	return backend
 }
 
 // ParseVariables is a helper function for testing variable parsing
 func ParseVariables(args []string) (map[string]string, error) {
 	result := make(map[string]string)
-	
+
 	for _, arg := range args {
 		parts := bytes.SplitN([]byte(arg), []byte("="), 2)
 		if len(parts) != 2 {
 			return nil, errors.New("invalid format")
 		}
-		
+
 		key := string(parts[0])
 		value := string(parts[1])
-		
+
 		// Validate variable name
 		if key == "" {
 			return nil, errors.New("invalid variable name")
 		}
-		
+
 		result[key] = value
 	}
-	
+
 	return result, nil
 }

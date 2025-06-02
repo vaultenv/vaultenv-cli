@@ -56,13 +56,13 @@ func (m *MockKeystore) List(service string) ([]string, error) {
 	}
 	var accounts []string
 	prefix := service + ":"
-	
+
 	for key := range m.keys {
 		if len(key) > len(prefix) && key[:len(prefix)] == prefix {
 			account := key[len(prefix):]
 			accounts = append(accounts, account)
 		}
 	}
-	
+
 	return accounts, nil
 }

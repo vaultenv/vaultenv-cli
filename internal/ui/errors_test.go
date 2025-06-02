@@ -16,7 +16,7 @@ func TestErrorWithHelp(t *testing.T) {
 		DocsLink:   "https://example.com/docs",
 		Code:       "TEST_ERROR",
 	}
-	
+
 	if err.Error() != "Test error message" {
 		t.Errorf("Error() = %v, want 'Test error message'", err.Error())
 	}
@@ -67,21 +67,21 @@ func TestNewError(t *testing.T) {
 			wantErr:     true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := NewError(tt.code, tt.args...)
-			
+
 			if err.Error() != tt.wantMessage {
 				t.Errorf("NewError() message = %v, want %v", err.Error(), tt.wantMessage)
 			}
-			
+
 			if !tt.wantErr {
 				if helpErr, ok := err.(ErrorWithHelp); ok {
 					if helpErr.Code != tt.wantCode {
 						t.Errorf("NewError() code = %v, want %v", helpErr.Code, tt.wantCode)
 					}
-					
+
 					// Check that common errors have suggestions and docs
 					template := commonErrors[tt.code]
 					if helpErr.Suggestion != template.Suggestion {
@@ -102,15 +102,15 @@ func TestHandleError(t *testing.T) {
 	// Disable color for consistent testing
 	color.NoColor = true
 	defer func() { color.NoColor = false }()
-	
+
 	tests := []struct {
 		name       string
 		err        error
 		wantOutput []string
 	}{
 		{
-			name: "nil_error",
-			err:  nil,
+			name:       "nil_error",
+			err:        nil,
 			wantOutput: []string{},
 		},
 		{
@@ -167,17 +167,17 @@ func TestHandleError(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var outBuf, errBuf bytes.Buffer
 			SetOutput(&outBuf, &errBuf)
 			defer ResetOutput()
-			
+
 			HandleError(tt.err)
-			
+
 			output := outBuf.String() + errBuf.String()
-			
+
 			for _, expected := range tt.wantOutput {
 				if !strings.Contains(output, expected) {
 					t.Errorf("HandleError() output missing %q\nGot: %s", expected, output)
@@ -191,11 +191,11 @@ func TestDisplayErrorWithHelp(t *testing.T) {
 	// Disable color for consistent testing
 	color.NoColor = true
 	defer func() { color.NoColor = false }()
-	
+
 	var outBuf, errBuf bytes.Buffer
 	SetOutput(&outBuf, &errBuf)
 	defer ResetOutput()
-	
+
 	// Test with all fields
 	err := ErrorWithHelp{
 		Message:    "Full error",
@@ -203,11 +203,11 @@ func TestDisplayErrorWithHelp(t *testing.T) {
 		DocsLink:   "https://example.com",
 		Code:       "ERR_123",
 	}
-	
+
 	displayErrorWithHelp(err)
-	
+
 	output := outBuf.String() + errBuf.String()
-	
+
 	// Check all components are present
 	expectedParts := []string{
 		"✗ Full error",
@@ -216,29 +216,29 @@ func TestDisplayErrorWithHelp(t *testing.T) {
 		"📚 Learn more: https://example.com",
 		"Error code: ERR_123",
 	}
-	
+
 	for _, part := range expectedParts {
 		if !strings.Contains(output, part) {
 			t.Errorf("displayErrorWithHelp() missing %q", part)
 		}
 	}
-	
+
 	// Test with minimal fields
 	outBuf.Reset()
 	errBuf.Reset()
-	
+
 	minErr := ErrorWithHelp{
 		Message: "Minimal error",
 	}
-	
+
 	displayErrorWithHelp(minErr)
-	
+
 	output = outBuf.String() + errBuf.String()
-	
+
 	if !strings.Contains(output, "✗ Minimal error") {
 		t.Error("displayErrorWithHelp() missing error message")
 	}
-	
+
 	// Should not show optional fields
 	if strings.Contains(output, "💡 Suggestion:") {
 		t.Error("displayErrorWithHelp() showed empty suggestion")
@@ -260,14 +260,14 @@ func TestCommonErrors(t *testing.T) {
 		"PERMISSION_DENIED",
 		"INVALID_CONFIG",
 	}
-	
+
 	for _, code := range requiredCodes {
 		err, exists := commonErrors[code]
 		if !exists {
 			t.Errorf("Missing common error: %s", code)
 			continue
 		}
-		
+
 		if err.Message == "" {
 			t.Errorf("Common error %s has empty message", code)
 		}
@@ -284,7 +284,7 @@ func TestDisplaySpecializedErrors(t *testing.T) {
 	// Disable color for consistent testing
 	color.NoColor = true
 	defer func() { color.NoColor = false }()
-	
+
 	tests := []struct {
 		name     string
 		fn       func()
@@ -322,17 +322,17 @@ func TestDisplaySpecializedErrors(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var outBuf, errBuf bytes.Buffer
 			SetOutput(&outBuf, &errBuf)
 			defer ResetOutput()
-			
+
 			tt.fn()
-			
+
 			output := outBuf.String() + errBuf.String()
-			
+
 			for _, expected := range tt.expected {
 				if !strings.Contains(output, expected) {
 					t.Errorf("%s() missing %q\nGot: %s", tt.name, expected, output)
@@ -346,9 +346,9 @@ func BenchmarkHandleError(b *testing.B) {
 	var buf bytes.Buffer
 	SetOutput(&buf, &buf)
 	defer ResetOutput()
-	
+
 	err := NewError("ENV_NOT_FOUND", "production")
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		HandleError(err)

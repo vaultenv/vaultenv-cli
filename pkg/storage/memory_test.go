@@ -9,7 +9,7 @@ import (
 
 func TestMemoryBackend_Set(t *testing.T) {
 	backend := NewMemoryBackend()
-	
+
 	tests := []struct {
 		name    string
 		key     string
@@ -25,7 +25,7 @@ func TestMemoryBackend_Set(t *testing.T) {
 		{"encrypted", "ENCRYPTED", "secret", true, false},
 		{"multiline", "MULTILINE", "line1\nline2\nline3", false, false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := backend.Set(tt.key, tt.value, tt.encrypt)
@@ -38,11 +38,11 @@ func TestMemoryBackend_Set(t *testing.T) {
 
 func TestMemoryBackend_Get(t *testing.T) {
 	backend := NewMemoryBackend()
-	
+
 	// Set some test data
 	backend.Set("EXISTING", "value", false)
 	backend.Set("EMPTY", "", false)
-	
+
 	tests := []struct {
 		name    string
 		key     string
@@ -53,7 +53,7 @@ func TestMemoryBackend_Get(t *testing.T) {
 		{"empty_value", "EMPTY", "", false},
 		{"not_found", "NOTFOUND", "", true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := backend.Get(tt.key)
@@ -73,10 +73,10 @@ func TestMemoryBackend_Get(t *testing.T) {
 
 func TestMemoryBackend_Exists(t *testing.T) {
 	backend := NewMemoryBackend()
-	
+
 	// Set test data
 	backend.Set("EXISTING", "value", false)
-	
+
 	tests := []struct {
 		name string
 		key  string
@@ -86,7 +86,7 @@ func TestMemoryBackend_Exists(t *testing.T) {
 		{"not_found", "NOTFOUND", false},
 		{"empty_key", "", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := backend.Exists(tt.key)
@@ -103,29 +103,29 @@ func TestMemoryBackend_Exists(t *testing.T) {
 
 func TestMemoryBackend_Delete(t *testing.T) {
 	backend := NewMemoryBackend()
-	
+
 	// Set test data
 	backend.Set("TO_DELETE", "value", false)
 	backend.Set("TO_KEEP", "value", false)
-	
+
 	// Delete existing key
 	err := backend.Delete("TO_DELETE")
 	if err != nil {
 		t.Errorf("Delete() error = %v", err)
 	}
-	
+
 	// Verify deletion
 	exists, _ := backend.Exists("TO_DELETE")
 	if exists {
 		t.Error("Delete() did not remove the key")
 	}
-	
+
 	// Verify other keys remain
 	exists, _ = backend.Exists("TO_KEEP")
 	if !exists {
 		t.Error("Delete() removed wrong key")
 	}
-	
+
 	// Delete non-existing key (should not error)
 	err = backend.Delete("NOTFOUND")
 	if err != nil {
@@ -135,7 +135,7 @@ func TestMemoryBackend_Delete(t *testing.T) {
 
 func TestMemoryBackend_List(t *testing.T) {
 	backend := NewMemoryBackend()
-	
+
 	// Test empty list
 	keys, err := backend.List()
 	if err != nil {
@@ -144,27 +144,27 @@ func TestMemoryBackend_List(t *testing.T) {
 	if len(keys) != 0 {
 		t.Errorf("List() = %v, want empty list", keys)
 	}
-	
+
 	// Add test data
 	testKeys := []string{"KEY1", "KEY2", "KEY3", "ANOTHER_KEY"}
 	for _, key := range testKeys {
 		backend.Set(key, "value", false)
 	}
-	
+
 	// Get list
 	keys, err = backend.List()
 	if err != nil {
 		t.Errorf("List() error = %v", err)
 	}
-	
+
 	// Sort for comparison
 	sort.Strings(keys)
 	sort.Strings(testKeys)
-	
+
 	if len(keys) != len(testKeys) {
 		t.Errorf("List() returned %d keys, want %d", len(keys), len(testKeys))
 	}
-	
+
 	for i, key := range keys {
 		if key != testKeys[i] {
 			t.Errorf("List()[%d] = %v, want %v", i, key, testKeys[i])
@@ -174,13 +174,13 @@ func TestMemoryBackend_List(t *testing.T) {
 
 func TestMemoryBackend_Close(t *testing.T) {
 	backend := NewMemoryBackend()
-	
+
 	// Close should always succeed
 	err := backend.Close()
 	if err != nil {
 		t.Errorf("Close() error = %v", err)
 	}
-	
+
 	// Should still work after close (for memory backend)
 	err = backend.Set("KEY", "value", false)
 	if err != nil {
@@ -190,16 +190,16 @@ func TestMemoryBackend_Close(t *testing.T) {
 
 func TestMemoryBackend_Overwrite(t *testing.T) {
 	backend := NewMemoryBackend()
-	
+
 	// Set initial value
 	backend.Set("KEY", "initial", false)
-	
+
 	// Overwrite
 	err := backend.Set("KEY", "updated", false)
 	if err != nil {
 		t.Errorf("Set() overwrite error = %v", err)
 	}
-	
+
 	// Verify new value
 	value, _ := backend.Get("KEY")
 	if value != "updated" {
@@ -209,32 +209,32 @@ func TestMemoryBackend_Overwrite(t *testing.T) {
 
 func TestMemoryBackend_Concurrent(t *testing.T) {
 	backend := NewMemoryBackend()
-	
+
 	// Test concurrent writes
 	var wg sync.WaitGroup
 	numGoroutines := 100
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
 			key := fmt.Sprintf("KEY_%d", n)
 			value := fmt.Sprintf("value_%d", n)
-			
+
 			if err := backend.Set(key, value, false); err != nil {
 				t.Errorf("Concurrent Set() error = %v", err)
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
-	
+
 	// Verify all keys were set
 	keys, _ := backend.List()
 	if len(keys) != numGoroutines {
 		t.Errorf("Expected %d keys, got %d", numGoroutines, len(keys))
 	}
-	
+
 	// Test concurrent reads
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
@@ -242,7 +242,7 @@ func TestMemoryBackend_Concurrent(t *testing.T) {
 			defer wg.Done()
 			key := fmt.Sprintf("KEY_%d", n)
 			expectedValue := fmt.Sprintf("value_%d", n)
-			
+
 			value, err := backend.Get(key)
 			if err != nil {
 				t.Errorf("Concurrent Get() error = %v", err)
@@ -253,16 +253,16 @@ func TestMemoryBackend_Concurrent(t *testing.T) {
 			}
 		}(i)
 	}
-	
+
 	wg.Wait()
 }
 
 func TestMemoryBackend_MixedOperations(t *testing.T) {
 	backend := NewMemoryBackend()
-	
+
 	// Perform mixed operations
 	var wg sync.WaitGroup
-	
+
 	// Writer
 	wg.Add(1)
 	go func() {
@@ -271,7 +271,7 @@ func TestMemoryBackend_MixedOperations(t *testing.T) {
 			backend.Set(fmt.Sprintf("WRITE_%d", i), "value", false)
 		}
 	}()
-	
+
 	// Reader
 	wg.Add(1)
 	go func() {
@@ -280,7 +280,7 @@ func TestMemoryBackend_MixedOperations(t *testing.T) {
 			backend.List()
 		}
 	}()
-	
+
 	// Deleter
 	wg.Add(1)
 	go func() {
@@ -289,9 +289,9 @@ func TestMemoryBackend_MixedOperations(t *testing.T) {
 			backend.Delete(fmt.Sprintf("WRITE_%d", i))
 		}
 	}()
-	
+
 	wg.Wait()
-	
+
 	// Verify state is consistent
 	keys, _ := backend.List()
 	if len(keys) < 25 {
@@ -301,7 +301,7 @@ func TestMemoryBackend_MixedOperations(t *testing.T) {
 
 func BenchmarkMemoryBackend_Set(b *testing.B) {
 	backend := NewMemoryBackend()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		key := fmt.Sprintf("KEY_%d", i)
@@ -311,12 +311,12 @@ func BenchmarkMemoryBackend_Set(b *testing.B) {
 
 func BenchmarkMemoryBackend_Get(b *testing.B) {
 	backend := NewMemoryBackend()
-	
+
 	// Pre-populate
 	for i := 0; i < 1000; i++ {
 		backend.Set(fmt.Sprintf("KEY_%d", i), "value", false)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		key := fmt.Sprintf("KEY_%d", i%1000)
@@ -326,12 +326,12 @@ func BenchmarkMemoryBackend_Get(b *testing.B) {
 
 func BenchmarkMemoryBackend_List(b *testing.B) {
 	backend := NewMemoryBackend()
-	
+
 	// Pre-populate
 	for i := 0; i < 1000; i++ {
 		backend.Set(fmt.Sprintf("KEY_%d", i), "value", false)
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		backend.List()

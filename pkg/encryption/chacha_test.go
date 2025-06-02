@@ -15,7 +15,7 @@ func TestChaChaEncryptor_Algorithm(t *testing.T) {
 func TestChaChaEncryptor_NotImplemented(t *testing.T) {
 	enc := NewChaChaEncryptor()
 	key := make([]byte, 32)
-	
+
 	// Test all methods return not implemented error
 	tests := []struct {
 		name string
@@ -57,7 +57,7 @@ func TestChaChaEncryptor_NotImplemented(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.fn()
@@ -70,7 +70,7 @@ func TestChaChaEncryptor_NotImplemented(t *testing.T) {
 
 func TestChaChaEncryptor_GenerateKey(t *testing.T) {
 	enc := NewChaChaEncryptor()
-	
+
 	// GenerateKey returns nil (stub implementation)
 	key := enc.GenerateKey("password", []byte("salt"))
 	if key != nil {

@@ -380,13 +380,13 @@ func updateLocalVault(environment string) error {
 // handleMergeConflicts handles git merge conflicts
 func handleMergeConflicts(autoMerge bool, strategy string, environment string) error {
 	ui.Warning("Merge conflicts detected")
-	
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
-	
+
 	// Create storage backend
 	stor, err := storage.GetBackendWithOptions(storage.BackendOptions{
 		Type:        cfg.Vault.Type,
@@ -396,23 +396,23 @@ func handleMergeConflicts(autoMerge bool, strategy string, environment string) e
 	if err != nil {
 		return fmt.Errorf("failed to create storage: %w", err)
 	}
-	
+
 	// Create conflict detector
 	detector := sync.NewGitConflictDetector(stor, cfg)
-	
+
 	// Detect conflicts
 	conflicts, err := detector.DetectConflicts()
 	if err != nil {
 		return fmt.Errorf("failed to detect conflicts: %w", err)
 	}
-	
+
 	if len(conflicts) == 0 {
 		ui.Info("No conflicts found")
 		return nil
 	}
-	
+
 	ui.Info("Found %d conflicts", len(conflicts))
-	
+
 	// Filter by environment if specified
 	if environment != "" {
 		var filtered []sync.Conflict
@@ -424,59 +424,59 @@ func handleMergeConflicts(autoMerge bool, strategy string, environment string) e
 		conflicts = filtered
 		ui.Info("Filtered to %d conflicts in %s environment", len(conflicts), environment)
 	}
-	
+
 	// Determine strategy
 	conflictStrategy := sync.ConflictStrategy(strategy)
 	if !autoMerge {
 		conflictStrategy = sync.StrategyPrompt
 	}
-	
+
 	// Create conflict set
 	conflictSet := &sync.ConflictSet{
 		Conflicts: conflicts,
 		Strategy:  conflictStrategy,
 	}
-	
+
 	// Resolve conflicts
 	resolutions, err := conflictSet.ResolveAll()
 	if err != nil {
 		return fmt.Errorf("failed to resolve conflicts: %w", err)
 	}
-	
+
 	// Apply resolutions
 	for key, resolution := range resolutions {
 		parts := strings.Split(key, "/")
 		if len(parts) != 2 {
 			continue
 		}
-		
+
 		env := parts[0]
 		variable := parts[1]
-		
+
 		// Build file path
 		filePath := filepath.Join(".vaultenv", "git", env, variable+".env")
-		
+
 		// Write resolved value
 		if err := detector.ResolveConflictFile(filePath, resolution.Value); err != nil {
 			ui.Error("Failed to write resolution for %s: %v", key, err)
 			continue
 		}
-		
+
 		// Stage the resolved file
 		cmd := exec.Command("git", "add", filePath)
 		if err := cmd.Run(); err != nil {
 			ui.Error("Failed to stage resolved file %s: %v", filePath, err)
 		}
 	}
-	
+
 	// Show summary
 	ui.Success(conflictSet.Summary(resolutions))
-	
+
 	// If all conflicts resolved, suggest committing
 	if len(resolutions) == len(conflicts) {
 		ui.Info("All conflicts resolved. Run 'git commit' to complete the merge.")
 	}
-	
+
 	return nil
 }
 

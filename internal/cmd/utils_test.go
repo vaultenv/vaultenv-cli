@@ -11,13 +11,13 @@ func TestIsTestEnvironment(t *testing.T) {
 		// Save original value
 		orig := os.Getenv("VAULTENV_TEST")
 		defer os.Setenv("VAULTENV_TEST", orig)
-		
+
 		// Test when set to "1"
 		os.Setenv("VAULTENV_TEST", "1")
 		if !isTestEnvironment() {
 			t.Error("isTestEnvironment() should return true when VAULTENV_TEST=1")
 		}
-		
+
 		// Test when not set
 		os.Setenv("VAULTENV_TEST", "")
 		if isTestEnvironment() {

@@ -27,7 +27,6 @@ func NewEnvironmentKeyManager(keystore *Keystore, projectID string) *Environment
 	}
 }
 
-
 // GetOrCreateEnvironmentKey retrieves or creates an encryption key for a specific environment
 // This method embodies the zero-knowledge principle - the key is derived from the user's
 // password and never stored in plaintext

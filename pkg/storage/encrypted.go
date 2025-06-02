@@ -13,9 +13,9 @@ import (
 type EncryptedValue struct {
 	Algorithm   string `json:"algorithm"`
 	Version     int    `json:"version"`
-	Salt        string `json:"salt"`        // Base64 encoded
-	Nonce       string `json:"nonce"`       // Base64 encoded
-	Ciphertext  string `json:"ciphertext"`  // Base64 encoded
+	Salt        string `json:"salt"`       // Base64 encoded
+	Nonce       string `json:"nonce"`      // Base64 encoded
+	Ciphertext  string `json:"ciphertext"` // Base64 encoded
 	CreatedAt   int64  `json:"created_at"`
 	IsEncrypted bool   `json:"is_encrypted"`
 }
@@ -38,14 +38,14 @@ func NewEncryptedBackend(backend Backend, password string) (*EncryptedBackend, e
 
 	// Use default encryptor (AES-GCM-256)
 	encryptor := encryption.DefaultEncryptor()
-	
+
 	// For the master key, we use a fixed salt derived from the password itself
 	// This ensures consistent key derivation across instances
 	masterSalt := []byte("vaultenv-master-salt-v1")
-	
+
 	// Derive key from password
 	key := encryptor.GenerateKey(password, masterSalt)
-	
+
 	return &EncryptedBackend{
 		backend:   backend,
 		encryptor: encryptor,
@@ -68,10 +68,10 @@ func NewEncryptedBackendWithEncryptor(backend Backend, password string, encrypto
 	// For the master key, we use a fixed salt derived from the password itself
 	// This ensures consistent key derivation across instances
 	masterSalt := []byte("vaultenv-master-salt-v1")
-	
+
 	// Derive key from password
 	key := encryptor.GenerateKey(password, masterSalt)
-	
+
 	return &EncryptedBackend{
 		backend:   backend,
 		encryptor: encryptor,
@@ -90,13 +90,13 @@ func (e *EncryptedBackend) Set(key, value string, encrypt bool) error {
 			Ciphertext:  value, // Store plaintext in ciphertext field
 			CreatedAt:   time.Now().Unix(),
 		}
-		
+
 		// Marshal to JSON
 		data, err := json.Marshal(ev)
 		if err != nil {
 			return fmt.Errorf("failed to marshal value: %w", err)
 		}
-		
+
 		return e.backend.Set(key, string(data), false)
 	}
 
@@ -105,16 +105,16 @@ func (e *EncryptedBackend) Set(key, value string, encrypt bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to generate salt: %w", err)
 	}
-	
+
 	// Derive key for this specific value
 	valueKey := e.encryptor.GenerateKey(string(e.key), salt)
-	
+
 	// Encrypt the value
 	ciphertext, err := e.encryptor.Encrypt([]byte(value), valueKey)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt value: %w", err)
 	}
-	
+
 	// Create encrypted value with metadata
 	ev := EncryptedValue{
 		Algorithm:   e.encryptor.Algorithm(),
@@ -124,13 +124,13 @@ func (e *EncryptedBackend) Set(key, value string, encrypt bool) error {
 		IsEncrypted: true,
 		CreatedAt:   time.Now().Unix(),
 	}
-	
+
 	// Marshal to JSON
 	data, err := json.Marshal(ev)
 	if err != nil {
 		return fmt.Errorf("failed to marshal encrypted value: %w", err)
 	}
-	
+
 	// Store in backend
 	return e.backend.Set(key, string(data), false)
 }
@@ -142,31 +142,31 @@ func (e *EncryptedBackend) Get(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Try to unmarshal as encrypted value
 	var ev EncryptedValue
 	if err := json.Unmarshal([]byte(data), &ev); err != nil {
 		// If unmarshal fails, assume it's legacy plaintext
 		return data, nil
 	}
-	
+
 	// If not encrypted, return the plaintext
 	if !ev.IsEncrypted {
 		return ev.Ciphertext, nil
 	}
-	
+
 	// Decode salt
 	salt, err := base64.StdEncoding.DecodeString(ev.Salt)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode salt: %w", err)
 	}
-	
+
 	// Decode ciphertext
 	ciphertext, err := base64.StdEncoding.DecodeString(ev.Ciphertext)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode ciphertext: %w", err)
 	}
-	
+
 	// Get the appropriate encryptor
 	encryptor := e.encryptor
 	if ev.Algorithm != e.encryptor.Algorithm() {
@@ -176,16 +176,16 @@ func (e *EncryptedBackend) Get(key string) (string, error) {
 			return "", fmt.Errorf("unsupported algorithm %s: %w", ev.Algorithm, err)
 		}
 	}
-	
+
 	// Derive key for this specific value
 	valueKey := encryptor.GenerateKey(string(e.key), salt)
-	
+
 	// Decrypt
 	plaintext, err := encryptor.Decrypt(ciphertext, valueKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to decrypt value: %w", err)
 	}
-	
+
 	return string(plaintext), nil
 }
 
@@ -214,16 +214,16 @@ func (e *EncryptedBackend) UpdatePassword(oldPassword, newPassword string) error
 	if oldPassword == "" || newPassword == "" {
 		return fmt.Errorf("passwords cannot be empty")
 	}
-	
+
 	// Get all keys
 	keys, err := e.backend.List()
 	if err != nil {
 		return fmt.Errorf("failed to list keys: %w", err)
 	}
-	
+
 	// Store decrypted values
 	valuesToReencrypt := make(map[string]string)
-	
+
 	// First pass: decrypt all encrypted values with old password
 	for _, key := range keys {
 		// Get raw data
@@ -231,37 +231,37 @@ func (e *EncryptedBackend) UpdatePassword(oldPassword, newPassword string) error
 		if err != nil {
 			return fmt.Errorf("failed to get raw data for %s: %w", key, err)
 		}
-		
+
 		var ev EncryptedValue
 		if err := json.Unmarshal([]byte(data), &ev); err != nil {
 			// Skip non-encrypted values
 			continue
 		}
-		
+
 		if !ev.IsEncrypted {
 			// Skip non-encrypted values
 			continue
 		}
-		
+
 		// Get decrypted value
 		value, err := e.Get(key)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt %s: %w", key, err)
 		}
-		
+
 		valuesToReencrypt[key] = value
 	}
-	
+
 	// Use the same fixed master salt for key derivation
 	masterSalt := []byte("vaultenv-master-salt-v1")
 	newKey := e.encryptor.GenerateKey(newPassword, masterSalt)
-	
+
 	// Store old key for rollback
 	oldKey := e.key
-	
+
 	// Update to new key
 	e.key = newKey
-	
+
 	// Second pass: re-encrypt all values with new password
 	for key, value := range valuesToReencrypt {
 		if err := e.Set(key, value, true); err != nil {
@@ -270,6 +270,6 @@ func (e *EncryptedBackend) UpdatePassword(oldPassword, newPassword string) error
 			return fmt.Errorf("failed to re-encrypt %s: %w", key, err)
 		}
 	}
-	
+
 	return nil
 }

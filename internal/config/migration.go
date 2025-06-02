@@ -44,7 +44,7 @@ func migrateV1ToV2(old *Config) *Config {
 	// Ensure all environments have password protection enabled
 	for env, config := range old.Environments {
 		config.PasswordProtected = true
-		
+
 		// If no password policy is set, use sensible defaults based on environment
 		if config.PasswordPolicy.MinLength == 0 {
 			switch env {
@@ -79,7 +79,7 @@ func migrateV1ToV2(old *Config) *Config {
 				config.PasswordPolicy = old.Security.PasswordPolicy
 			}
 		}
-		
+
 		old.Environments[env] = config
 	}
 
@@ -112,9 +112,8 @@ func migrateV1ToV2(old *Config) *Config {
 // Main changes: Import/Export config, enhanced Git config
 func migrateV2ToV3(old *Config) *Config {
 	// Add Import configuration if missing
-	if old.Import.DefaultParser.TrimSpace == false && 
-	   old.Import.DefaultParser.IgnoreComments == false &&
-	   old.Import.DefaultParser.IgnoreEmpty == false {
+	// Check if Import config is completely empty (all fields at zero values)
+	if old.Import.DefaultParser == (ParserConfig{}) && old.Import.AutoBackup == false && old.Import.ValidateFormat == false {
 		old.Import = ImportConfig{
 			DefaultParser: ParserConfig{
 				TrimSpace:      true,
@@ -141,7 +140,7 @@ func migrateV2ToV3(old *Config) *Config {
 	if old.Git.ConflictStrategy == "" {
 		old.Git.ConflictStrategy = "prompt"
 	}
-	
+
 	// Migrate DeterministicMode to EncryptionMode
 	if old.Git.DeterministicMode && old.Git.EncryptionMode == "" {
 		old.Git.EncryptionMode = "deterministic"

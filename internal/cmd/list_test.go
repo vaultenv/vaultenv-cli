@@ -27,16 +27,16 @@ func TestListCommand(t *testing.T) {
 
 	// Add test data
 	testData := map[string]string{
-		"DATABASE_URL":     "postgres://localhost/test",
-		"API_KEY":          "secret123",
-		"API_SECRET":       "hidden",
-		"FEATURE_ENABLED":  "true",
-		"SERVICE_URL":      "http://service.local",
-		"DEBUG":            "false",
-		"LOG_LEVEL":        "info",
-		"AWS_ACCESS_KEY":   "AKIA...",
-		"AWS_SECRET_KEY":   "secret",
-		"EMPTY_VALUE":      "",
+		"DATABASE_URL":    "postgres://localhost/test",
+		"API_KEY":         "secret123",
+		"API_SECRET":      "hidden",
+		"FEATURE_ENABLED": "true",
+		"SERVICE_URL":     "http://service.local",
+		"DEBUG":           "false",
+		"LOG_LEVEL":       "info",
+		"AWS_ACCESS_KEY":  "AKIA...",
+		"AWS_SECRET_KEY":  "secret",
+		"EMPTY_VALUE":     "",
 	}
 
 	for key, value := range testData {
@@ -168,12 +168,12 @@ func TestListCommand(t *testing.T) {
 						keys = append(keys, parts[0])
 					}
 				}
-				
+
 				// Check if sorted
 				sortedKeys := make([]string, len(keys))
 				copy(sortedKeys, keys)
 				sort.Strings(sortedKeys)
-				
+
 				for i, key := range keys {
 					if key != sortedKeys[i] {
 						t.Errorf("Keys not sorted: position %d has %q, want %q", i, key, sortedKeys[i])
@@ -329,12 +329,12 @@ func TestListCommandEmpty(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			
+
 			if len(keys) == 0 {
 				cmd.Println("No environment variables found")
 				return nil
 			}
-			
+
 			for _, key := range keys {
 				cmd.Println(key)
 			}
@@ -387,13 +387,13 @@ func TestListCommandStats(t *testing.T) {
 		Use: "list",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			stats, _ := cmd.Flags().GetBool("stats")
-			
+
 			keys, _ := store.List()
-			
+
 			if stats {
 				emptyCount := 0
 				totalSize := 0
-				
+
 				for _, key := range keys {
 					value, _ := store.Get(key)
 					if value == "" {
@@ -401,7 +401,7 @@ func TestListCommandStats(t *testing.T) {
 					}
 					totalSize += len(key) + len(value)
 				}
-				
+
 				cmd.Printf("Total variables: %d\n", len(keys))
 				cmd.Printf("Empty values: %d\n", emptyCount)
 				cmd.Printf("Total size: %d bytes\n", totalSize)
@@ -443,7 +443,7 @@ func isSecret(key string) bool {
 		"SECRET", "KEY", "TOKEN", "PASSWORD", "PASS", "PWD",
 		"PRIVATE", "CREDENTIAL", "AUTH",
 	}
-	
+
 	upperKey := strings.ToUpper(key)
 	for _, pattern := range secretPatterns {
 		if strings.Contains(upperKey, pattern) {

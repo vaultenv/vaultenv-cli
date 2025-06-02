@@ -158,9 +158,9 @@ func ExampleSetTestBackend() {
 	backend, _ := storage.GetBackend("any-environment")
 	value, _ := backend.Get("TEST_MODE")
 
-	fmt.Println(value)
-	// Output: true
-
 	// Reset when done testing
 	storage.ResetTestBackend()
+
+	fmt.Println(value)
+	// Output: true
 }

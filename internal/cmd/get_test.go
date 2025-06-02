@@ -28,11 +28,11 @@ func TestGetCommand(t *testing.T) {
 
 	// Add some test data
 	testData := map[string]string{
-		"DATABASE_URL":    "postgres://localhost/test",
-		"API_KEY":         "secret123",
-		"FEATURE_FLAG":    "true",
-		"NESTED__VALUE":   "nested",
-		"PORT":            "8080",
+		"DATABASE_URL":  "postgres://localhost/test",
+		"API_KEY":       "secret123",
+		"FEATURE_FLAG":  "true",
+		"NESTED__VALUE": "nested",
+		"PORT":          "8080",
 	}
 
 	for key, value := range testData {
@@ -308,10 +308,10 @@ func TestGetCommandPatterns(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		pattern    string
-		wantKeys   []string
-		wantErr    bool
+		name     string
+		pattern  string
+		wantKeys []string
+		wantErr  bool
 	}{
 		{
 			name:     "pattern_db_prefix",
@@ -349,7 +349,7 @@ func TestGetCommandPatterns(t *testing.T) {
 					// Simulate pattern matching
 					pattern := args[0]
 					found := false
-					
+
 					keys, err := store.List()
 					if err != nil {
 						return err

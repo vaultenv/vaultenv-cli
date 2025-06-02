@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package cmd
@@ -36,7 +37,7 @@ func TestIntegration_BasicWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Chdir(oldWd)
-	
+
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +72,7 @@ func TestIntegration_BasicWorkflow(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				
+
 				val, err := store.Get("DATABASE_URL")
 				if err != nil || val != "postgres://localhost/test" {
 					return err
@@ -97,13 +98,13 @@ func TestIntegration_BasicWorkflow(t *testing.T) {
 				if _, err := os.Stat(".env.export"); os.IsNotExist(err) {
 					return err
 				}
-				
+
 				// Verify content
 				content, err := ioutil.ReadFile(".env.export")
 				if err != nil {
 					return err
 				}
-				
+
 				if !strings.Contains(string(content), "DATABASE_URL=") {
 					t.Error("Export file missing DATABASE_URL")
 				}
@@ -143,22 +144,22 @@ func TestIntegration_BasicWorkflow(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create root command
 			rootCmd := createTestRootCommand()
-			
+
 			// Set args
 			args := append([]string{tt.command}, tt.args...)
 			rootCmd.SetArgs(args)
-			
+
 			// Execute
 			var buf bytes.Buffer
 			rootCmd.SetOut(&buf)
 			rootCmd.SetErr(&buf)
-			
+
 			err := rootCmd.Execute()
 			if err != nil {
 				t.Errorf("Command failed: %v\nOutput: %s", err, buf.String())
 				return
 			}
-			
+
 			// Run check
 			if tt.check != nil {
 				if err := tt.check(t); err != nil {
@@ -252,7 +253,7 @@ func TestIntegration_GitWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Chdir(oldWd)
-	
+
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +333,7 @@ func TestIntegration_MultiEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.Chdir(oldWd)
-	
+
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatal(err)
 	}
@@ -428,7 +429,7 @@ func TestIntegration_BackupRestore(t *testing.T) {
 	// Create backup
 	backupPath := filepath.Join(tmpDir, "backup.db")
 	// In real implementation, would use backup command
-	
+
 	// Simulate data loss
 	store.Delete("KEY2")
 	store.Set("KEY1", "corrupted", false)
@@ -459,7 +460,7 @@ func TestIntegration_Performance(t *testing.T) {
 	// Measure bulk operations
 	t.Run("bulk_set", func(t *testing.T) {
 		start := time.Now()
-		
+
 		for i := 0; i < 1000; i++ {
 			key := fmt.Sprintf("KEY_%d", i)
 			value := fmt.Sprintf("value_%d", i)
@@ -467,10 +468,10 @@ func TestIntegration_Performance(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		
+
 		duration := time.Since(start)
 		t.Logf("Set 1000 keys in %v", duration)
-		
+
 		if duration > 5*time.Second {
 			t.Error("Bulk set too slow")
 		}
@@ -478,17 +479,17 @@ func TestIntegration_Performance(t *testing.T) {
 
 	t.Run("bulk_get", func(t *testing.T) {
 		start := time.Now()
-		
+
 		for i := 0; i < 1000; i++ {
 			key := fmt.Sprintf("KEY_%d", i)
 			if _, err := store.Get(key); err != nil {
 				t.Fatal(err)
 			}
 		}
-		
+
 		duration := time.Since(start)
 		t.Logf("Get 1000 keys in %v", duration)
-		
+
 		if duration > 1*time.Second {
 			t.Error("Bulk get too slow")
 		}
@@ -505,7 +506,7 @@ func createTestRootCommand() *cobra.Command {
 
 	// Add minimal commands needed for integration tests
 	// In real implementation, would use actual command implementations
-	
+
 	return rootCmd
 }
 
