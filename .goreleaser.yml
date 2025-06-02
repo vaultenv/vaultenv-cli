@@ -23,6 +23,78 @@ before:
     # Create a VERSION file for the build
     - echo "{{ .Version }}" > VERSION
 
+    # Create installation script for Unix-like systems
+    # This script is created here because GoReleaser v2 doesn't support archive hooks
+    - |
+      cat > install.sh << 'EOF'
+      #!/bin/sh
+      set -e
+
+      # VaultEnv CLI Installation Script
+      VERSION="{{ .Version }}"
+      BINARY_NAME="vaultenv-cli"
+      INSTALL_DIR="/usr/local/bin"
+
+      echo "Installing VaultEnv CLI ${VERSION} (Beta)..."
+      echo ""
+
+      # Check if running as root for system-wide installation
+      if [ "$EUID" -ne 0 ] && [ "$USER" != "root" ]; then 
+          echo "Note: Running without sudo. Installing to user's local bin directory."
+          INSTALL_DIR="$HOME/.local/bin"
+          mkdir -p "$INSTALL_DIR"
+          
+          # Check if local bin is in PATH
+          if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
+              echo "Warning: $HOME/.local/bin is not in your PATH"
+              echo "You may need to add it by running:"
+              echo "  export PATH=\"\$PATH:\$HOME/.local/bin\""
+              echo ""
+          fi
+      fi
+
+      # Check if binary exists in current directory
+      if [ ! -f "./$BINARY_NAME" ]; then
+          echo "Error: $BINARY_NAME not found in current directory"
+          echo "Please run this script from the directory containing the binary"
+          exit 1
+      fi
+
+      # Check if old version exists
+      if command -v "$BINARY_NAME" >/dev/null 2>&1; then
+          OLD_VERSION=$("$BINARY_NAME" --version 2>/dev/null || echo "unknown")
+          echo "Found existing installation: $OLD_VERSION"
+          echo "Upgrading to $VERSION..."
+      fi
+
+      # Install the binary
+      echo "Installing to: $INSTALL_DIR/$BINARY_NAME"
+      install -m 755 "$BINARY_NAME" "$INSTALL_DIR/" || {
+          echo "Error: Installation failed"
+          echo "You may need to run: sudo $0"
+          exit 1
+      }
+
+      # Verify installation
+      if command -v "$BINARY_NAME" >/dev/null 2>&1; then
+          INSTALLED_VERSION=$("$BINARY_NAME" --version 2>/dev/null || echo "unknown")
+          echo ""
+          echo "✅ Installation complete!"
+          echo "📍 Location: $(which "$BINARY_NAME")"
+          echo "📦 Version: $INSTALLED_VERSION"
+          echo ""
+          echo "Run 'vaultenv-cli --help' to get started"
+      else
+          echo ""
+          echo "⚠️  Installation complete, but $BINARY_NAME not found in PATH"
+          echo "   Add $INSTALL_DIR to your PATH:"
+          echo "   export PATH=\"\$PATH:$INSTALL_DIR\""
+      fi
+      EOF
+
+    # Make the installation script executable
+    - chmod +x install.sh
+
 # Build configuration
 builds:
   - id: vaultenv-cli
@@ -31,7 +103,7 @@ builds:
 
     # Build flags for optimization and metadata
     flags:
-      - -trimpath # Remove file paths from binary
+      - -trimpath # Remove file paths from binary for reproducible builds
 
     # Disable CGO for better portability
     env:
@@ -80,7 +152,6 @@ builds:
       - -X main.builtBy=goreleaser
       - -X main.gitBranch={{.Branch}}
       - -X main.gitState={{.IsGitDirty}}
-      - -X main.buildHost={{.Env.HOSTNAME}}
 
     # Use commit timestamp for reproducible builds
     mod_timestamp: "{{ .CommitTimestamp }}"
@@ -116,36 +187,46 @@ archives:
 
     # Files to include in the archive
     files:
+      # Core files
       - LICENSE
       - README.md
       - CHANGELOG.md
-      - docs/**/*
-      - examples/**/*
-      - completions/**/*
+
+      # Documentation (if these directories exist)
+      - src: docs
+        dst: docs
+        strip_parent: true
+        exclude:
+          - "**/.DS_Store"
+
+      # Examples (if directory exists)
+      - src: examples
+        dst: examples
+        strip_parent: true
+        exclude:
+          - "**/.DS_Store"
+
+      # Shell completions (if directory exists)
+      - src: completions
+        dst: completions
+        strip_parent: true
+
+      # Version file
       - src: VERSION
         dst: VERSION
 
-    # Add installation script for Unix systems
-    hooks:
-      post:
-        - cmd: |
-            cat > {{ .Path }}/install.sh << 'EOF'
-            #!/bin/sh
-            set -e
-            echo "Installing vaultenv-cli {{ .Version }} (Beta)..."
-            install -m 755 vaultenv-cli /usr/local/bin/
-            echo "✅ Installation complete!"
-            echo "Run 'vaultenv-cli --version' to verify"
-            EOF
-          filter:
-            goos: [linux, darwin, freebsd, openbsd]
+      # Installation script (only for Unix-like systems)
+      - src: install.sh
+        dst: install.sh
+        info:
+          mode: 0755 # Ensure it remains executable
+        filter:
+          goos: [linux, darwin, freebsd, openbsd] # Only include for Unix-like systems
 
 # Create checksums for all artifacts
 checksum:
   name_template: "checksums.txt"
   algorithm: sha256
-  extra_files:
-    - glob: ./dist/*.json # Include metadata files
 
 # Snapshot naming for development builds
 snapshot:
@@ -203,7 +284,7 @@ release:
   draft: false
 
   # Release name template
-  name_template: "VaultEnv CLI {{ .Version }} (Beta)"
+  name_template: "VaultEnv CLI {{ .Version }}"
 
   # Custom header for beta releases
   header: |
@@ -223,14 +304,16 @@ release:
     curl -sSL https://install.vaultenv.io/beta | bash
     ```
 
-    #### Homebrew (macOS/Linux)
-    ```bash
-    brew tap vaultenv/beta
-    brew install vaultenv-cli-beta
-    ```
-
     #### Manual Download
-    Download the appropriate archive for your platform below and extract it.
+    1. Download the appropriate archive for your platform below
+    2. Extract the archive: `tar -xzf vaultenv-cli_*.tar.gz`
+    3. Run the installation script: `./install.sh`
+    4. Or manually copy the binary: `sudo cp vaultenv-cli /usr/local/bin/`
+
+    #### Verify Installation
+    ```bash
+    vaultenv-cli --version
+    ```
 
     ### 🧪 Beta Testing Focus Areas
 
@@ -258,12 +341,6 @@ release:
 
     **Full Changelog**: https://github.com/vaultenv/vaultenv-cli/compare/{{ .PreviousTag }}...{{ .Tag }}
 
-  # Extra files to upload with release
-  extra_files:
-    - glob: ./dist/checksums.txt
-    - glob: ./VERSION
-    - glob: ./install.sh
-
 # Linux packages for easier installation
 nfpms:
   - id: vaultenv-cli
@@ -287,7 +364,6 @@ nfpms:
 
     # Version metadata
     version_metadata: beta
-    release: "{{ .Version }}"
 
     # Dependencies
     dependencies:
@@ -302,26 +378,32 @@ nfpms:
       # Binary
       - src: ./vaultenv-cli
         dst: /usr/bin/vaultenv-cli
+        type: file
+        file_info:
+          mode: 0755
 
       # Documentation
       - src: ./LICENSE
         dst: /usr/share/doc/vaultenv-cli-beta/LICENSE
+        type: file
+
       - src: ./README.md
         dst: /usr/share/doc/vaultenv-cli-beta/README.md
+        type: file
+
       - src: ./CHANGELOG.md
         dst: /usr/share/doc/vaultenv-cli-beta/CHANGELOG.md
+        type: file
 
-      # Shell completions
-      - src: ./completions/vaultenv-cli.bash
-        dst: /usr/share/bash-completion/completions/vaultenv-cli
-      - src: ./completions/vaultenv-cli.zsh
-        dst: /usr/share/zsh/site-functions/_vaultenv-cli
-      - src: ./completions/vaultenv-cli.fish
-        dst: /usr/share/fish/vendor_completions.d/vaultenv-cli.fish
+      # Create directories for completions if they don't exist
+      - dst: /usr/share/bash-completion/completions
+        type: dir
 
-      # Man page (if you have one)
-      # - src: ./man/vaultenv-cli.1
-      #   dst: /usr/share/man/man1/vaultenv-cli.1
+      - dst: /usr/share/zsh/site-functions
+        type: dir
+
+      - dst: /usr/share/fish/vendor_completions.d
+        type: dir
 
     # Post-install script
     scripts:
@@ -333,44 +415,13 @@ nfpms:
         echo ""
         echo "Run 'vaultenv-cli --help' to get started"
 
-# Docker image configuration
-# dockers:
-#   - id: vaultenv-cli
-#     ids:
-#       - vaultenv-cli
-
-#     # Image templates - push to GitHub Container Registry
-#     image_templates:
-#       - "ghcr.io/vaultenv/vaultenv-cli:{{ .Version }}"
-#       - "ghcr.io/vaultenv/vaultenv-cli:beta"
-#       - "ghcr.io/vaultenv/vaultenv-cli:{{ .Major }}.{{ .Minor }}-beta"
-
-#     # Build for multiple platforms
-#     use: buildx
-#     goos: linux
-#     goarch: amd64
-
-#     # Dockerfile content
-#     dockerfile: |
-#       FROM alpine:3.19
-#       RUN apk add --no-cache ca-certificates git
-#       COPY vaultenv-cli /usr/local/bin/
-
-#       # Add non-root user
-#       RUN adduser -D -u 1000 vaultenv
-#       USER vaultenv
-
-#       ENTRYPOINT ["vaultenv-cli"]
-
-#     # Build flags
-#     build_flag_templates:
-#       - "--pull"
-#       - "--label=org.opencontainers.image.created={{.Date}}"
-#       - "--label=org.opencontainers.image.name={{.ProjectName}}"
-#       - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-#       - "--label=org.opencontainers.image.version={{.Version}}"
-#       - "--label=org.opencontainers.image.source={{.GitURL}}"
-#       - "--label=org.opencontainers.image.description=Secure environment variable management (Beta)"
+        # Generate shell completions if the binary supports it
+        if command -v vaultenv-cli >/dev/null 2>&1; then
+            # Try to generate completions (ignore errors if not supported)
+            vaultenv-cli completion bash > /usr/share/bash-completion/completions/vaultenv-cli 2>/dev/null || true
+            vaultenv-cli completion zsh > /usr/share/zsh/site-functions/_vaultenv-cli 2>/dev/null || true
+            vaultenv-cli completion fish > /usr/share/fish/vendor_completions.d/vaultenv-cli.fish 2>/dev/null || true
+        fi
 
 # Create a source tarball
 source:
@@ -378,31 +429,7 @@ source:
   name_template: "{{ .ProjectName }}_{{ .Version }}_source"
   format: tar.gz
 
-# Sign artifacts with cosign (optional but recommended for security)
-# signs:
-#   - cmd: cosign
-#     stdin: '{{ .Env.COSIGN_PASSWORD }}'
-#     args:
-#       - "sign-blob"
-#       - "--key=cosign.key"
-#       - "--output-signature=${signature}"
-#       - "${artifact}"
-#     artifacts: all
-
 # Create Software Bill of Materials (SBOM)
 sboms:
   - artifacts: archive
     args: ["$artifact", "--output", "cyclonedx-json@1.5=$document"]
-# Announce the release (optional)
-# announce:
-#   skip: false
-
-#   # Discord webhook announcement
-#   discord:
-#     enabled: true
-#     message_template: |
-#       🚀 **VaultEnv CLI {{ .Version }} Beta Released!**
-
-#       Check it out: {{ .ReleaseURL }}
-
-#       This is a beta release - your feedback is invaluable!
