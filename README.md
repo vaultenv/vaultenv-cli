@@ -1,141 +1,196 @@
-# VaultEnv CLI - Secure Environment Variable Management 🔐
+# VaultEnv CLI - Zero-Knowledge Secrets Management for Modern Development Teams 🔐
 
+[![Go Version](https://img.shields.io/badge/go-%3E%3D1.22-blue)](https://go.dev)
 [![Beta Version](https://img.shields.io/badge/version-v0.1.0--beta.1-orange)](https://github.com/vaultenv/vaultenv-cli/releases)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/vaultenv/vaultenv-cli)](https://go.dev)
-[![Test Coverage](https://img.shields.io/badge/coverage-56.5%25-yellow)](./coverage.out)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Test Coverage](https://img.shields.io/badge/coverage-60%25-yellow)](./docs/TEST_COVERAGE_REPORT.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Go Report Card](https://goreportcard.com/badge/github.com/vaultenv/vaultenv-cli)](https://goreportcard.com/report/github.com/vaultenv/vaultenv-cli)
+[![Security: Zero-Knowledge](https://img.shields.io/badge/Security-Zero--Knowledge-brightgreen)](./SECURITY.md)
 
-> ⚠️ **Beta Release**: This is a beta version. While core features are stable, some functionality may change before the 1.0 release.
+> 🚀 **The secure, Git-friendly environment variable manager that developers actually love using**
 
-VaultEnv CLI is a secure, developer-friendly command-line tool for managing environment variables across different environments. Built with zero-knowledge encryption, it ensures your secrets remain secure while providing a seamless development experience.
+VaultEnv revolutionizes how development teams manage secrets and environment variables. With military-grade encryption, seamless Git integration, and a delightful developer experience, it's the tool you've been waiting for since EnvKey's shutdown.
+
+## ✨ Why VaultEnv?
+
+**🔐 True Zero-Knowledge Architecture** - Your secrets are encrypted client-side. We can't read them, even if we wanted to.
+
+**⚡ 5-Minute Setup** - From install to your first encrypted secret in under 5 minutes. No complex configurations, no steep learning curve.
+
+**🔄 Git-Native Workflow** - Encrypted .vaultenv files live in your repo. Branch, merge, and collaborate without fear.
+
+**🎯 Developer-First Design** - Intuitive commands, helpful error messages, and shortcuts for common tasks. Built by developers, for developers.
 
 ## 🚀 Quick Start
 
 ### Installation
 
 ```bash
-# macOS
-brew install vaultenv/tap/vaultenv-cli
+# macOS/Linux (via Homebrew)
+brew tap vaultenv/tap
+brew install vaultenv-cli
 
-# Linux/Windows
-curl -sSL https://install.vaultenv.io | bash
+# macOS/Linux (via curl)
+curl -sSL https://install.vaultenv.dev | bash
+
+# Windows (via Scoop)
+scoop bucket add vaultenv https://github.com/vaultenv/scoop-bucket
+scoop install vaultenv-cli
 
 # Go developers
 go install github.com/vaultenv/vaultenv-cli/cmd/vaultenv-cli@latest
+
+# Docker
+docker run -it vaultenv/cli:latest
 ```
 
-### First Steps
+### Your First Secret (< 60 seconds)
 
 ```bash
-# Initialize a new project
-vaultenv-cli init
+# Initialize your project
+vaultenv init
 
-# Set a variable
-vaultenv-cli set DATABASE_URL=postgres://localhost/myapp
+# Set your first secret
+vaultenv set DATABASE_URL="postgres://localhost/myapp"
 
-# Get a variable
-vaultenv-cli get DATABASE_URL
+# Use it in your application
+vaultenv run -- npm start
 
-# List all variables
-vaultenv-cli list
-
-# Switch environments
-vaultenv-cli set API_KEY=prod-key --env production
+# Share with your team (secrets are encrypted!)
+git add .vaultenv
+git commit -m "Add encrypted environment config"
+git push
 ```
 
-## ✨ Key Features
+## 🎯 Core Features
 
-- **🔐 Zero-Knowledge Encryption**: Client-side AES-256-GCM encryption with Argon2id key derivation
-- **🔑 Per-Environment Passwords**: Separate encryption keys for each environment
-- **📁 Multiple Storage Backends**: File, SQLite, and Git-friendly storage options
-- **🔄 Git Integration**: Deterministic encryption mode for clean diffs
-- **📋 Import/Export**: Support for .env, JSON, YAML, and Docker formats
-- **🔍 Audit Trail**: Complete history tracking with SQLite backend
-- **🔒 OS Keychain Integration**: Secure key storage using system keychains
-- **🎯 Developer Friendly**: Intuitive commands and helpful error messages
+### 🔐 **Bank-Grade Security**
 
-## 🛠️ Development
+- **AES-256-GCM** encryption with **Argon2id** key derivation
+- **Per-environment** encryption keys
+- **OS keychain** integration for secure key storage
+- **Zero-knowledge** - your secrets never leave your machine unencrypted
 
-### Prerequisites
-
-- Go 1.22 or higher
-- Make
-
-### Building from Source
+### 🚀 **Developer Experience**
 
 ```bash
-# Clone the repository
-git clone https://github.com/vaultenv/vaultenv-cli.git
-cd vaultenv-cli
+# Intuitive commands that just make sense
+vaultenv set API_KEY="sk-123" --env production
+vaultenv get API_KEY
+vaultenv list --env staging
+vaultenv run -- cargo test
 
-# Build the binary
-go build -o vaultenv ./cmd/vaultenv-cli
+# Import existing .env files in seconds
+vaultenv import .env --env development
 
-# Run tests
-go test ./...
-
-# Run tests with coverage
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
-
-# Install locally
-go install ./cmd/vaultenv-cli
+# Export for CI/CD
+vaultenv export --format dotenv > .env.production
 ```
 
-### Project Structure
+### 🔄 **Team Collaboration**
 
-```
-vaultenv-cli/
-├── cmd/vaultenv-cli/    # Application entry point
-├── internal/            # Private application code
-│   ├── auth/           # Password management and authentication
-│   ├── cmd/            # Command implementations
-│   ├── config/         # Configuration management
-│   ├── keystore/       # Encryption key storage
-│   ├── ui/             # Terminal UI components
-│   └── test/           # Test helpers
-├── pkg/                # Public packages
-│   ├── access/         # Access control
-│   ├── dotenv/         # .env file parsing
-│   ├── encryption/     # Encryption implementations
-│   ├── export/         # Export format handlers
-│   ├── keystore/       # OS keychain integration
-│   └── storage/        # Storage backends
-├── docs/               # Documentation
-└── scripts/            # Build and test scripts
+```bash
+# Git-friendly deterministic encryption
+vaultenv set --deterministic SHARED_KEY="value"
+
+# Sync with your team
+git pull
+vaultenv sync
+
+# Handle conflicts like a pro
+vaultenv conflicts resolve
 ```
 
-## 🤝 Contributing
+### 📊 **Enterprise Ready**
 
-We love contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+- **Audit trails** with SQLite backend
+- **Access control** per environment
+- **Compliance-friendly** export formats
+- **Migration tools** for easy adoption
 
-Quick ways to contribute:
+## 🆚 Why Choose VaultEnv?
 
-- 🐛 Report bugs
-- 💡 Suggest features
-- 📖 Improve documentation
-- 🔧 Submit pull requests
+| Feature           | VaultEnv           | .env Files    | direnv        | dotenv-vault         |
+| ----------------- | ------------------ | ------------- | ------------- | -------------------- |
+| **Encryption**    | ✅ Zero-knowledge  | ❌ Plaintext  | ❌ Plaintext  | ✅ Basic             |
+| **Git-Safe**      | ✅ Encrypted files | ❌ .gitignore | ❌ .gitignore | ⚠️ Separate          |
+| **Team Sync**     | ✅ Built-in        | ❌ Manual     | ❌ Manual     | ✅ Cloud-only        |
+| **Audit Trail**   | ✅ Complete        | ❌ None       | ❌ None       | ⚠️ Limited           |
+| **Offline-First** | ✅ Always works    | ✅ Yes        | ✅ Yes        | ❌ Requires internet |
+| **Free & Open**   | ✅ MIT License     | ✅ N/A        | ✅ MIT        | ⚠️ Freemium          |
 
 ## 📚 Documentation
 
-- [Getting Started Guide](https://docs.vaultenv.io/getting-started)
-- [Security Architecture](https://docs.vaultenv.io/security)
-- [API Reference](https://docs.vaultenv.io/api)
-- [Examples](https://github.com/vaultenv/vaultenv-cli/tree/main/examples)
+- 📖 **[Getting Started Guide](./docs/guides/GETTING_STARTED.md)** - Your journey begins here
+- 🔐 **[Security Architecture](./docs/ARCHITECTURE.md#security)** - How we keep your secrets safe
+- 🔧 **[CLI Reference](./docs/reference/COMMANDS.md)** - Complete command documentation
+- 🚀 **[Migration Guide](./docs/guides/MIGRATION_GUIDE.md)** - Switch from .env files or other tools
+- 👥 **[Team Collaboration](./docs/guides/TEAM_COLLABORATION.md)** - Work together securely
+- 🛠️ **[API Documentation](./docs/API.md)** - Build on top of VaultEnv
 
-## 🏢 Commercial Support
+## 🤝 Contributing
 
-Need enterprise features? Check out [vaultenv Cloud](https://vaultenv.io) for:
+VaultEnv is open source and we love contributions! Whether you're fixing bugs, adding features, improving docs, or spreading the word - we appreciate your help.
 
-- Team management and collaboration
-- Audit logging and compliance
-- SSO/SAML integration
-- Priority support
+Check out our **[Contributing Guide](CONTRIBUTING.md)** to get started. We welcome:
+
+- 🐛 Bug reports and fixes
+- ✨ Feature suggestions and implementations
+- 📖 Documentation improvements
+- 🧪 Test coverage improvements
+- 🌐 Translations
+- 💡 Ideas and feedback
+
+## 🔒 Security
+
+Security is our top priority. VaultEnv uses industry-standard encryption and follows security best practices.
+
+- 🔍 **[Security Policy](SECURITY.md)** - How to report vulnerabilities
+- 🛡️ **[Security Best Practices](./docs/guides/SECURITY_BEST_PRACTICES.md)** - Keep your secrets safe
+- 🔐 **[Encryption Details](./docs/ARCHITECTURE.md#encryption)** - Technical implementation
+
+Found a security issue? Please check our **[Security Policy](SECURITY.md)** for responsible disclosure.
+
+## 🚀 What's Next?
+
+### Coming Soon (v0.2.0)
+
+- 🔌 Plugin system for custom integrations
+- 🌍 Multi-region support
+- 📱 Mobile companion app
+- 🤖 GitHub Actions integration
+
+### VaultEnv Cloud (Coming Q4 2025)
+
+Need enterprise features? **[Join the waitlist](https://vaultenv.dev/cloud)** for:
+
+- ☁️ Automatic team synchronization
+- 📊 Advanced audit logging
+- 🔐 SSO/SAML integration
+- 👥 Role-based access control
+- 📞 Priority support
 
 ## 📄 License
 
-vaultenv-cli is MIT licensed. See [LICENSE](LICENSE) file for details.
+VaultEnv CLI is open source under the **[MIT License](LICENSE)**. Use it freely in personal and commercial projects.
+
+## 🙏 Acknowledgments
+
+Built with amazing open source projects:
+
+- [Cobra](https://github.com/spf13/cobra) - CLI framework
+- [Viper](https://github.com/spf13/viper) - Configuration management
+- [SQLite](https://sqlite.org) - Embedded database
+- [x/crypto](https://pkg.go.dev/golang.org/x/crypto) - Cryptography
+
+Special thanks to all our **[contributors](https://github.com/vaultenv/vaultenv-cli/graphs/contributors)**!
 
 ---
 
-Built with ❤️ by developers, for developers.
+<div align="center">
+  
+**[Website](https://vaultenv.dev)** • **[Documentation](https://docs.vaultenv.dev)** • **[Discord](https://discord.gg/vaultenv)** • **[Twitter](https://twitter.com/vaultenv)**
+
+Made with ❤️ by developers who were tired of managing .env files
+
+</div>
